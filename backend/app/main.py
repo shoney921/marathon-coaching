@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -6,18 +6,27 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import json
 
-from models.user import User
-from models.training import TrainingLog, SleepLog, RaceGoal
-from models.feedback import AIFeedback
+from app.models.user import User
+from app.models.training import TrainingLog, SleepLog, RaceGoal
+from app.models.feedback import AIFeedback
 from tasks.coaching import request_coaching
 
 # 데이터베이스 설정
-SQLALCHEMY_DATABASE_URL = "sqlite:///./marathon.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./marathon.db?check_same_thread=False"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# 데이터베이스 테이블 생성
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
+
+# 앱 시작 시 데이터베이스 초기화
+@app.on_event("startup")
+async def startup():
+    init_db()
 
 # 의존성 주입
 def get_db():
