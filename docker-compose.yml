@@ -1,0 +1,39 @@
+name: marathon-coaching
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - mcp-server
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+
+  celery-worker:
+    build: ./backend
+    command: celery -A tasks.coaching worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - backend
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+
+  mcp-server:
+    build: ./mcp
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./mcp:/app
+    environment:
+      - PORT=8000
+
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
