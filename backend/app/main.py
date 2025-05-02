@@ -39,6 +39,10 @@ def get_db():
 
 @app.post("/users/")
 async def create_user(user_data: dict, db: Session = Depends(get_db)):
+    # 비밀번호 해시화
+    hashed_password = User.get_password_hash(user_data.pop("password"))
+    user_data["hashed_password"] = hashed_password
+    
     user = User(**user_data)
     db.add(user)
     db.commit()
@@ -103,3 +107,30 @@ async def get_feedback(feedback_id: int, db: Session = Depends(get_db)):
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback not found")
     return feedback 
+
+@app.post("/auth/login/")
+async def login(user_data: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data["email"]).first()
+    if not user or not user.verify_password(user_data["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    print("## user")
+    print(user)
+    return {"message": "Login successful", "user": user}
+
+
+@app.post("/auth/register/")
+async def register(user_data: dict, db: Session = Depends(get_db)):
+
+    print("## user_data")
+    print(user_data)
+
+    # 비밀번호 해시화
+    hashed_password = User.get_password_hash(user_data.pop("password"))
+    user_data["hashed_password"] = hashed_password
+    
+    user = User(**user_data)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"message": "Registration successful", "user_id": user.id}
+
