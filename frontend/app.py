@@ -27,7 +27,7 @@ def get_user_data():
     try:
         response = requests.get(
             f"{API_BASE_URL}/users/{st.session_state.user['id']}",
-            headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
             return response.json()
@@ -39,7 +39,7 @@ def get_training_logs():
     try:
         response = requests.get(
             f"{API_BASE_URL}/training-logs/user/{st.session_state.user['id']}",
-            headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
             return response.json()
@@ -51,7 +51,7 @@ def get_sleep_logs():
     try:
         response = requests.get(
             f"{API_BASE_URL}/sleep-logs/user/{st.session_state.user['id']}",
-            headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
             return response.json()
@@ -63,7 +63,7 @@ def get_feedback(feedback_id):
     try:
         response = requests.get(
             f"{API_BASE_URL}/feedback/{feedback_id}",
-            headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
             return response.json()
@@ -76,6 +76,10 @@ tab1, tab2, tab3, tab4 = st.tabs(["홈", "훈련 로그", "수면 로그", "AI �
 
 # 홈 페이지
 with tab1:
+    print("## st.session_state.user")
+    print(st.session_state.user)
+    print("## st.session_state.user['username']")
+    print(st.session_state.user['username'])
     st.title(f"🏃 {st.session_state.user['username']}님, 환영합니다!")
     
     # 사용자 정보 표시

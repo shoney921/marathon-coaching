@@ -20,7 +20,12 @@ def login_user(email, password):
             json={"email": email, "password": password}
         )
         if response.status_code == 200:
-            return response.json()
+            response_data = response.json()
+            st.session_state.user = response_data['user']   
+            st.session_state.token = response_data['token']
+            st.success("로그인 성공!")
+            st.rerun()
+            return response_data['user']
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"API 연결 오류: {str(e)}")

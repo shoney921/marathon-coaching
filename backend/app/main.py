@@ -113,9 +113,7 @@ async def login(user_data: dict, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data["email"]).first()
     if not user or not user.verify_password(user_data["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    print("## user")
-    print(user)
-    return {"message": "Login successful", "user": user}
+    return {"message": "Login successful", "user": user, "token": "1234567890"}
 
 
 @app.post("/auth/register/")
