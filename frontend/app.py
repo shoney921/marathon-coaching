@@ -132,7 +132,7 @@ with tab2:
                     response = requests.post(
                         f"{API_BASE_URL}/training-logs/",
                         json=log_data,
-                        headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+                        headers={"Authorization": f"Bearer {st.session_state.token}"}
                     )
                     if response.status_code == 200:
                         st.success("훈련 로그가 성공적으로 등록되었습니다!")

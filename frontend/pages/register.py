@@ -3,7 +3,7 @@ import requests
 import os
 
 # API 엔드포인트 설정
-API_BASE_URL = os.getenv("API_BASE_URL", "http://backend:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # 페이지 설정
 st.set_page_config(
@@ -59,14 +59,14 @@ def main():
             
             if register_user(user_data):
                 st.success("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.")
-                st.switch_page("../login.py")
+                st.switch_page("login.py")
             else:
                 st.error("회원가입에 실패했습니다. 다시 시도해주세요.")
     
     # 로그인 페이지로 돌아가기
     st.write("이미 계정이 있으신가요?")
     if st.button("로그인"):
-        st.switch_page("../login.py")
+        st.switch_page("login.py")
 
 if __name__ == "__main__":
     main() 
