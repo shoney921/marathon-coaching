@@ -37,3 +37,14 @@ services:
     image: redis:6.2
     ports:
       - "6379:6379"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - API_BASE_URL=http://backend:8000
+    depends_on:
+      - backend
