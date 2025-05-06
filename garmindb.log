@@ -1,0 +1,7 @@
+INFO:/Users/ishoney/Desktop/study/marathon-coach/venv/lib/python3.12/site-packages/garmindb/plugin_manager.py:Loading GarminDb plugins from /Users/ishoney/HealthData/Plugins
+INFO:/Users/ishoney/Desktop/study/marathon-coach/venv/lib/python3.12/site-packages/idbutils/plugin.py:Loading plugins from /Users/ishoney/HealthData/Plugins
+INFO:/Users/ishoney/Desktop/study/marathon-coach/venv/lib/python3.12/site-packages/idbutils/version.py:/Users/ishoney/Desktop/study/marathon-coach/venv/bin/garmindb_cli.py has been tested on Python 1...1...0
+INFO:/Users/ishoney/Desktop/study/marathon-coach/venv/lib/python3.12/site-packages/idbutils/version.py:/Users/ishoney/Desktop/study/marathon-coach/venv/bin/garmindb_cli.py 1...1...0
+INFO:root:Enabled statistics: [<Statistics.monitoring: 1>, <Statistics.steps: 2>, <Statistics.itime: 3>, <Statistics.sleep: 4>, <Statistics.rhr: 5>, <Statistics.weight: 6>, <Statistics.activities: 7>]
+INFO:/Users/ishoney/Desktop/study/marathon-coach/venv/bin/garmindb_cli.py:___Downloading All Data___
+INFO:root:session file /Users/ishoney/.GarminDb/garth_session not found
