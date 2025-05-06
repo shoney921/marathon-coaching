@@ -72,7 +72,7 @@ def get_feedback(feedback_id):
     return None
 
 # 탭 생성
-tab1, tab2, tab3, tab4 = st.tabs(["홈", "훈련 로그", "수면 로그", "AI 코칭"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["홈", "훈련 로그", "수면 로그", "AI 코칭", "코칭 요청", "데이터 연동"])
 
 # 홈 페이지
 with tab1:
@@ -178,10 +178,14 @@ with tab3:
                     "notes": notes if notes else None
                 }
                 try:
+                    print("## log_data")
+                    print(log_data)
+                    print("## st.session_state.token")
+                    print(st.session_state.token)
                     response = requests.post(
                         f"{API_BASE_URL}/sleep-logs/",
                         json=log_data,
-                        headers={"Authorization": f"Bearer {st.session_state.user['token']}"}
+                        headers={"Authorization": f"Bearer {st.session_state.token}"}
                     )
                     if response.status_code == 200:
                         st.success("수면 로그가 성공적으로 등록되었습니다!")
@@ -229,3 +233,15 @@ with tab4:
                     st.error(f"AI 코칭 요청에 실패했습니다. (상태 코드: {response.status_code})")
             except requests.exceptions.RequestException as e:
                 st.error(f"API 연결 오류: {str(e)}") 
+
+with tab6:
+    st.title("🔄 데이터 연동")
+
+    # 데이터 연동 페이지
+    with st.expander("데이터 연동"):
+        st.write("데이터 연동 페이지입니다.")
+
+    # 데이터 연동 버튼
+    if st.button("데이터 연동"):
+        st.write("데이터 연동 버튼이 클릭되었습니다.")
+

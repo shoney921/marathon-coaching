@@ -87,11 +87,20 @@ async def get_training_logs(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/sleep-logs/")
 async def create_sleep_log(log_data: dict, db: Session = Depends(get_db)):
+        # 문자열 날짜를 datetime 객체로 변환
+    if isinstance(log_data.get('date'), str):
+        log_data['date'] = datetime.fromisoformat(log_data['date'])
+    
     log = SleepLog(**log_data)
     db.add(log)
     db.commit()
     db.refresh(log)
     return log
+
+@app.get("/sleep-logs/user/{user_id}")
+async def get_sleep_logs(user_id: int, db: Session = Depends(get_db)):
+    logs = db.query(SleepLog).filter(SleepLog.user_id == user_id).all()
+    return logs
 
 @app.post("/request-coaching/{user_id}")
 async def request_ai_coaching(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
