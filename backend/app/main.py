@@ -144,101 +144,10 @@ async def register(user_data: dict, db: Session = Depends(get_db)):
     db.refresh(user)
     return {"message": "Registration successful", "user_id": user.id}
 
-@app.post("/activities/")
-async def create_activity(activity_data: dict, db: Session = Depends(get_db)):
-    # 문자열 날짜를 datetime 객체로 변환
-    if isinstance(activity_data.get('startTimeLocal'), str):
-        activity_data['start_time_local'] = datetime.fromisoformat(activity_data['startTimeLocal'])
-    if isinstance(activity_data.get('startTimeGMT'), str):
-        activity_data['start_time_gmt'] = datetime.fromisoformat(activity_data['startTimeGMT'])
-    if isinstance(activity_data.get('endTimeGMT'), str):
-        activity_data['end_time_gmt'] = datetime.fromisoformat(activity_data['endTimeGMT'])
-    
-    # JSON 필드 처리
-    activity_data['activity_type'] = activity_data.pop('activityType')
-    activity_data['event_type'] = activity_data.pop('eventType')
-    activity_data['privacy'] = activity_data.pop('privacy')
-    
-    # 심박수 구간 시간
-    hr_zones = {
-        'zone_1': activity_data.pop('hrTimeInZone_1', 0),
-        'zone_2': activity_data.pop('hrTimeInZone_2', 0),
-        'zone_3': activity_data.pop('hrTimeInZone_3', 0),
-        'zone_4': activity_data.pop('hrTimeInZone_4', 0),
-        'zone_5': activity_data.pop('hrTimeInZone_5', 0)
-    }
-    activity_data['hr_time_in_zones'] = hr_zones
-    
-    # 파워 구간 시간
-    power_zones = {
-        'zone_1': activity_data.pop('powerTimeInZone_1', 0),
-        'zone_2': activity_data.pop('powerTimeInZone_2', 0),
-        'zone_3': activity_data.pop('powerTimeInZone_3', 0),
-        'zone_4': activity_data.pop('powerTimeInZone_4', 0),
-        'zone_5': activity_data.pop('powerTimeInZone_5', 0)
-    }
-    activity_data['power_time_in_zones'] = power_zones
-    
-    # 컬럼명 변환
-    column_mapping = {
-        'activityId': 'activity_id',
-        'activityName': 'activity_name',
-        'distance': 'distance',
-        'duration': 'duration',
-        'elapsedDuration': 'elapsed_duration',
-        'movingDuration': 'moving_duration',
-        'elevationGain': 'elevation_gain',
-        'elevationLoss': 'elevation_loss',
-        'averageSpeed': 'average_speed',
-        'maxSpeed': 'max_speed',
-        'startLatitude': 'start_latitude',
-        'startLongitude': 'start_longitude',
-        'endLatitude': 'end_latitude',
-        'endLongitude': 'end_longitude',
-        'calories': 'calories',
-        'averageHR': 'average_hr',
-        'maxHR': 'max_hr',
-        'averageRunningCadenceInStepsPerMinute': 'average_cadence',
-        'maxRunningCadenceInStepsPerMinute': 'max_cadence',
-        'steps': 'steps',
-        'timeZoneId': 'time_zone_id',
-        'sportTypeId': 'sport_type_id',
-        'avgPower': 'avg_power',
-        'maxPower': 'max_power',
-        'aerobicTrainingEffect': 'aerobic_training_effect',
-        'anaerobicTrainingEffect': 'anaerobic_training_effect',
-        'avgVerticalOscillation': 'avg_vertical_oscillation',
-        'avgGroundContactTime': 'avg_ground_contact_time',
-        'avgStrideLength': 'avg_stride_length',
-        'vO2MaxValue': 'vo2max_value',
-        'deviceId': 'device_id',
-        'minElevation': 'min_elevation',
-        'maxElevation': 'max_elevation',
-        'manufacturer': 'manufacturer',
-        'lapCount': 'lap_count',
-        'waterEstimated': 'water_estimated',
-        'trainingEffectLabel': 'training_effect_label',
-        'activityTrainingLoad': 'activity_training_load',
-        'moderateIntensityMinutes': 'moderate_intensity_minutes',
-        'vigorousIntensityMinutes': 'vigorous_intensity_minutes',
-        'favorite': 'favorite',
-        'manualActivity': 'manual_activity',
-        'elevationCorrected': 'elevation_corrected'
-    }
-    
-    # 데이터 변환
-    converted_data = {}
-    for old_key, new_key in column_mapping.items():
-        if old_key in activity_data:
-            converted_data[new_key] = activity_data[old_key]
-    
-    activity = Activity(**converted_data)
-    db.add(activity)
-    db.commit()
-    db.refresh(activity)
-    return activity
-
-
+@app.get("/activities/user/{user_id}")
+async def get_activities(user_id: int, db: Session = Depends(get_db)):
+    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
+    return activities
 
 @app.get("/activities/", response_model=List[dict])
 async def get_activities(db: Session = Depends(get_db)):
@@ -260,8 +169,8 @@ class GarminSyncRequest(BaseModel):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@app.post("/sync-garmin-activities/")
-async def sync_garmin_activities(user_data: GarminSyncRequest, db: Session = Depends(get_db)):
+@app.post("/sync-garmin-activities/{user_id}")
+async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db: Session = Depends(get_db)):
     try:
         logger.info("Starting Garmin sync process")
         
@@ -328,6 +237,7 @@ async def sync_garmin_activities(user_data: GarminSyncRequest, db: Session = Dep
                 activity = Activity(
                     activity_id=activity_data.get('activityId'),
                     activity_name=activity_data.get('activityName'),
+                    user_id=user_id,
                     start_time_local=start_time_local,
                     start_time_gmt=start_time_gmt,
                     end_time_gmt=end_time_gmt,
