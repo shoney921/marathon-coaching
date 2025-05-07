@@ -147,19 +147,181 @@ async def register(user_data: dict, db: Session = Depends(get_db)):
 @app.get("/activities/user/{user_id}")
 async def get_activities(user_id: int, db: Session = Depends(get_db)):
     activities = db.query(Activity).filter(Activity.user_id == user_id).all()
-    return activities
+    return [{
+        "id": activity.id,
+        "activity_id": activity.activity_id,
+        "user_id": activity.user_id,
+        "activity_name": activity.activity_name,
+        "start_time_local": activity.start_time_local,
+        "start_time_gmt": activity.start_time_gmt,
+        "end_time_gmt": activity.end_time_gmt,
+        "activity_type": activity.activity_type,
+        "event_type": activity.event_type,
+        "distance": activity.distance,
+        "duration": activity.duration,
+        "elapsed_duration": activity.elapsed_duration,
+        "moving_duration": activity.moving_duration,
+        "elevation_gain": activity.elevation_gain,
+        "elevation_loss": activity.elevation_loss,
+        "min_elevation": activity.min_elevation,
+        "max_elevation": activity.max_elevation,
+        "elevation_corrected": activity.elevation_corrected,
+        "average_speed": activity.average_speed,
+        "max_speed": activity.max_speed,
+        "start_latitude": activity.start_latitude,
+        "start_longitude": activity.start_longitude,
+        "end_latitude": activity.end_latitude,
+        "end_longitude": activity.end_longitude,
+        "average_hr": activity.average_hr,
+        "max_hr": activity.max_hr,
+        "hr_time_in_zones": activity.hr_time_in_zones,
+        "avg_power": activity.avg_power,
+        "max_power": activity.max_power,
+        "power_time_in_zones": activity.power_time_in_zones,
+        "aerobic_training_effect": activity.aerobic_training_effect,
+        "anaerobic_training_effect": activity.anaerobic_training_effect,
+        "training_effect_label": activity.training_effect_label,
+        "vo2max_value": activity.vo2max_value,
+        "average_cadence": activity.average_cadence,
+        "max_cadence": activity.max_cadence,
+        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
+        "avg_ground_contact_time": activity.avg_ground_contact_time,
+        "avg_stride_length": activity.avg_stride_length,
+        "calories": activity.calories,
+        "water_estimated": activity.water_estimated,
+        "activity_training_load": activity.activity_training_load,
+        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
+        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
+        "steps": activity.steps,
+        "time_zone_id": activity.time_zone_id,
+        "sport_type_id": activity.sport_type_id,
+        "device_id": activity.device_id,
+        "manufacturer": activity.manufacturer,
+        "lap_count": activity.lap_count,
+        "privacy": activity.privacy,
+        "favorite": activity.favorite,
+        "manual_activity": activity.manual_activity
+    } for activity in activities]
 
 @app.get("/activities/", response_model=List[dict])
 async def get_activities(db: Session = Depends(get_db)):
     activities = db.query(Activity).all()
-    return activities
+    return [{
+        "id": activity.id,
+        "activity_id": activity.activity_id,
+        "user_id": activity.user_id,
+        "activity_name": activity.activity_name,
+        "start_time_local": activity.start_time_local,
+        "start_time_gmt": activity.start_time_gmt,
+        "end_time_gmt": activity.end_time_gmt,
+        "activity_type": activity.activity_type,
+        "event_type": activity.event_type,
+        "distance": activity.distance,
+        "duration": activity.duration,
+        "elapsed_duration": activity.elapsed_duration,
+        "moving_duration": activity.moving_duration,
+        "elevation_gain": activity.elevation_gain,
+        "elevation_loss": activity.elevation_loss,
+        "min_elevation": activity.min_elevation,
+        "max_elevation": activity.max_elevation,
+        "elevation_corrected": activity.elevation_corrected,
+        "average_speed": activity.average_speed,
+        "max_speed": activity.max_speed,
+        "start_latitude": activity.start_latitude,
+        "start_longitude": activity.start_longitude,
+        "end_latitude": activity.end_latitude,
+        "end_longitude": activity.end_longitude,
+        "average_hr": activity.average_hr,
+        "max_hr": activity.max_hr,
+        "hr_time_in_zones": activity.hr_time_in_zones,
+        "avg_power": activity.avg_power,
+        "max_power": activity.max_power,
+        "power_time_in_zones": activity.power_time_in_zones,
+        "aerobic_training_effect": activity.aerobic_training_effect,
+        "anaerobic_training_effect": activity.anaerobic_training_effect,
+        "training_effect_label": activity.training_effect_label,
+        "vo2max_value": activity.vo2max_value,
+        "average_cadence": activity.average_cadence,
+        "max_cadence": activity.max_cadence,
+        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
+        "avg_ground_contact_time": activity.avg_ground_contact_time,
+        "avg_stride_length": activity.avg_stride_length,
+        "calories": activity.calories,
+        "water_estimated": activity.water_estimated,
+        "activity_training_load": activity.activity_training_load,
+        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
+        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
+        "steps": activity.steps,
+        "time_zone_id": activity.time_zone_id,
+        "sport_type_id": activity.sport_type_id,
+        "device_id": activity.device_id,
+        "manufacturer": activity.manufacturer,
+        "lap_count": activity.lap_count,
+        "privacy": activity.privacy,
+        "favorite": activity.favorite,
+        "manual_activity": activity.manual_activity
+    } for activity in activities]
 
 @app.get("/activities/{activity_id}")
 async def get_activity(activity_id: int, db: Session = Depends(get_db)):
     activity = db.query(Activity).filter(Activity.activity_id == activity_id).first()
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    return activity
+    return {
+        "id": activity.id,
+        "activity_id": activity.activity_id,
+        "user_id": activity.user_id,
+        "activity_name": activity.activity_name,
+        "start_time_local": activity.start_time_local,
+        "start_time_gmt": activity.start_time_gmt,
+        "end_time_gmt": activity.end_time_gmt,
+        "activity_type": activity.activity_type,
+        "event_type": activity.event_type,
+        "distance": activity.distance,
+        "duration": activity.duration,
+        "elapsed_duration": activity.elapsed_duration,
+        "moving_duration": activity.moving_duration,
+        "elevation_gain": activity.elevation_gain,
+        "elevation_loss": activity.elevation_loss,
+        "min_elevation": activity.min_elevation,
+        "max_elevation": activity.max_elevation,
+        "elevation_corrected": activity.elevation_corrected,
+        "average_speed": activity.average_speed,
+        "max_speed": activity.max_speed,
+        "start_latitude": activity.start_latitude,
+        "start_longitude": activity.start_longitude,
+        "end_latitude": activity.end_latitude,
+        "end_longitude": activity.end_longitude,
+        "average_hr": activity.average_hr,
+        "max_hr": activity.max_hr,
+        "hr_time_in_zones": activity.hr_time_in_zones,
+        "avg_power": activity.avg_power,
+        "max_power": activity.max_power,
+        "power_time_in_zones": activity.power_time_in_zones,
+        "aerobic_training_effect": activity.aerobic_training_effect,
+        "anaerobic_training_effect": activity.anaerobic_training_effect,
+        "training_effect_label": activity.training_effect_label,
+        "vo2max_value": activity.vo2max_value,
+        "average_cadence": activity.average_cadence,
+        "max_cadence": activity.max_cadence,
+        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
+        "avg_ground_contact_time": activity.avg_ground_contact_time,
+        "avg_stride_length": activity.avg_stride_length,
+        "calories": activity.calories,
+        "water_estimated": activity.water_estimated,
+        "activity_training_load": activity.activity_training_load,
+        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
+        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
+        "steps": activity.steps,
+        "time_zone_id": activity.time_zone_id,
+        "sport_type_id": activity.sport_type_id,
+        "device_id": activity.device_id,
+        "manufacturer": activity.manufacturer,
+        "lap_count": activity.lap_count,
+        "privacy": activity.privacy,
+        "favorite": activity.favorite,
+        "manual_activity": activity.manual_activity
+    }
 
 class GarminSyncRequest(BaseModel):
     email: str
@@ -176,15 +338,24 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
         
         # Garmin Connect 클라이언트 초기화
         client = Garmin(user_data.email, user_data.password)
-        
+        print(user_data.email)
         # 로그인
         logger.info("Attempting to login to Garmin Connect")
-        client.login()
-        logger.info("Successfully logged in to Garmin Connect")
+        try:
+            client.login()
+            logger.info("Successfully logged in to Garmin Connect")
+        except Exception as e:
+            logger.error(f"Failed to login to Garmin Connect: {str(e)}")
+            raise HTTPException(status_code=401, detail="Failed to login to Garmin Connect")
         
         # 최근 활동 가져오기 (최근 10개)
         logger.info("Fetching recent activities")
-        activities = client.get_activities(0, 100)
+        try:
+            activities = client.get_activities(0, 100)
+            logger.info(f"Successfully fetched activities: {activities}")
+        except Exception as e:
+            logger.error(f"Failed to fetch activities: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to fetch activities from Garmin Connect")
         
         if not activities:
             logger.info("No activities found")
