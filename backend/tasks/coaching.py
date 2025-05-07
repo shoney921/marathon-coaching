@@ -3,8 +3,8 @@ import requests
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from app.models.base import Base
 from app.models.feedback import AIFeedback
-from app.models.user import Base
 
 # Celery 설정
 celery_app = Celery('coaching', broker='redis://redis:6379/0')
@@ -13,9 +13,6 @@ celery_app = Celery('coaching', broker='redis://redis:6379/0')
 SQLALCHEMY_DATABASE_URL = "sqlite:///./marathon.db?check_same_thread=False"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 데이터베이스 테이블 생성
-Base.metadata.create_all(bind=engine)
 
 @celery_app.task
 def request_coaching(user_id: int, feedback_id: int):
