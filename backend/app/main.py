@@ -203,9 +203,9 @@ async def get_activities(user_id: int, db: Session = Depends(get_db)):
         "manual_activity": activity.manual_activity
     } for activity in activities]
 
-@app.get("/activities/", response_model=List[dict])
-async def get_activities(db: Session = Depends(get_db)):
-    activities = db.query(Activity).all()
+@app.get("/activities/{user_id}", response_model=List[dict])
+async def get_activities(user_id: int, db: Session = Depends(get_db)):
+    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
     return [{
         "id": activity.id,
         "activity_id": activity.activity_id,
