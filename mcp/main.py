@@ -1,3 +1,5 @@
+import datetime
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Union
@@ -62,7 +64,7 @@ class BackendClient:
     async def get_running_activities(self, user_id: int):
         try:
             # 실제 API 호출 시도
-            url = f"{self.base_url}/activities/{user_id}"
+            url = f"{self.base_url}/activities/laps/user/{user_id}"
             try:
                 logger.info(f"백엔드 API 호출 시도: {url}")
                 async with aiohttp.ClientSession() as session:
@@ -187,12 +189,12 @@ class RunningActivityAgent:
                 Tool(
                     name="GetRunningActivities",
                     func=get_activities_wrapper,
-                    description="러닝 활동 데이터를 조회합니다."
+                    description="최근 한달간 러닝 활동 데이터를 조회합니다."
                 ),
                 Tool(
                     name="GetActivityStats",
                     func=get_stats_wrapper,
-                    description="러닝 활동 통계를 조회합니다."
+                    description="월간 러닝 활동 통계를 조회합니다."
                 )
             ]
             
@@ -205,12 +207,14 @@ class RunningActivityAgent:
 
     def _create_agent(self):
         prompt = PromptTemplate.from_template(
-            """당신은 20년차 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 전문적인 조언을 제공합니다.
-
-            사용 가능한 도구들:
-            {tools}
+            """당신은 20년차 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 질문에 대한 전문적인 조언을 제공합니다.
+            오늘 날짜는 {today}입니다. 조회한 데이터들의 시간 순서들도 잘 고려해서 질문의 답변을 해주세요. 
+            심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 질문에 대한 답변을 해주세요.
             
             사용 가능한 도구들: {tool_names}
+
+            사용 가능한 도구들의 설명:
+            {tools}
             
             질문: {input}
             
@@ -305,6 +309,7 @@ class RunningActivityAgent:
                     tools="\n".join([f"- {tool.name}: {tool.description}" for tool in self.tools]),
                     tool_names=", ".join([tool.name for tool in self.tools]),
                     input=input_text,
+                    today=datetime.now().strftime("%Y-%m-%d"),
                     agent_scratchpad=""
                 )
                 logger.info("=== Generated Prompt ===")
@@ -312,7 +317,7 @@ class RunningActivityAgent:
                 logger.info("======================")
             except Exception as e:
                 logger.error(f"Error formatting prompt: {str(e)}")
-                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error type: {type(e).__name__}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 raise
@@ -341,7 +346,10 @@ class RunningActivityAgent:
             async def execute_with_logging(input_text: str):
                 log_prompt(input_text)
                 try:
-                    response = await executor.ainvoke({"input": input_text})
+                    response = await executor.ainvoke({
+                        "input": input_text,
+                        "today": datetime.now().strftime("%Y-%m-%d")
+                    })
                     
                     # 중간 단계 로깅 추가
                     steps = response.get("intermediate_steps", [])
@@ -445,7 +453,7 @@ class RunningActivityAgent:
             return output
         except Exception as e:
             logger.error(f"Error processing query: {str(e)}")
-            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return "죄송합니다. 요청을 처리하는 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -507,13 +515,34 @@ class QueryRequest(BaseModel):
 @app.post("/query")
 async def process_query(request: QueryRequest):
     try:
+        logger.info(f"Received query request: {request}")
+        logger.info(f"Request body: {request.dict()}")
+        logger.info(f"Query: {request.query}")
+        logger.info(f"User ID: {request.user_id}")
+        
         agent = RunningActivityAgent(user_id=request.user_id)
+        logger.info("RunningActivityAgent initialized")
+        
         response = await agent.process_query(request.query)
+        logger.info(f"Agent response: {response}")
+        
         return {"response": response}
     except Exception as e:
         logger.error(f"Error in /query endpoint: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# 라우트 등록 확인을 위한 로깅 추가
+@app.on_event("startup")
+async def startup_event():
+    logger.info("FastAPI application starting up...")
+    logger.info("Registered routes:")
+    for route in app.routes:
+        logger.info(f"Route: {route.path}, Methods: {route.methods}")
 
 if __name__ == "__main__":
     import uvicorn
+    logger.info("Starting server...")
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True) 
