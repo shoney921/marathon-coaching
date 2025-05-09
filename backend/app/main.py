@@ -14,9 +14,8 @@ import time
 from app.models.base import Base
 from app.models.user import User
 from app.models.training import TrainingLog, SleepLog, RaceGoal
-from app.models.feedback import AIFeedback
 from app.models.activity import Activity, ActivitySplit
-from tasks.coaching import request_coaching
+# from tasks.coaching import request_coaching
 
 # 로깅 설정
 logging.basicConfig(
@@ -48,6 +47,11 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup():
     init_db()
+
+@app.get("/dbinit")
+async def dbinit():
+    init_db()
+    return {"message": "Database initialized"}
 
 # 의존성 주입
 def get_db():
@@ -168,30 +172,6 @@ async def create_sleep_log(log_data: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(log)
     return log
-
-@app.post("/request-coaching/{user_id}")
-async def request_ai_coaching(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    # AI 피드백 요청 생성
-    feedback = AIFeedback(
-        user_id=user_id,
-        created_at=datetime.now(),
-        status="pending"
-    )
-    db.add(feedback)
-    db.commit()
-    db.refresh(feedback)
-    
-    # Celery 태스크 실행
-    background_tasks.add_task(request_coaching, user_id, feedback.id)
-    
-    return {"message": "Coaching request submitted", "feedback_id": feedback.id}
-
-@app.get("/feedback/{feedback_id}")
-async def get_feedback(feedback_id: int, db: Session = Depends(get_db)):
-    feedback = db.query(AIFeedback).filter(AIFeedback.id == feedback_id).first()
-    if not feedback:
-        raise HTTPException(status_code=404, detail="Feedback not found")
-    return feedback 
 
 @app.post("/auth/login/")
 async def login(user_data: dict, db: Session = Depends(get_db)):
