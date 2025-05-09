@@ -21,7 +21,7 @@ class User(Base):
     training_logs = relationship("TrainingLog", back_populates="user")
     sleep_logs = relationship("SleepLog", back_populates="user")
     race_goals = relationship("RaceGoal", back_populates="user")
-    ai_feedbacks = relationship("AIFeedback", back_populates="user")
+    activity_feedbacks = relationship("ActivityFeedback", back_populates="user")
     
     def verify_password(self, plain_password: str) -> bool:
         return pwd_context.verify(plain_password, self.hashed_password)

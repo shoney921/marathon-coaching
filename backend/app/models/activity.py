@@ -80,6 +80,7 @@ class Activity(Base):
 
     # 관계 설정
     splits = relationship("ActivitySplit", back_populates="activity")
+    activity_feedbacks = relationship("ActivityFeedback", back_populates="activity")
 
 class ActivitySplit(Base):
     __tablename__ = "activity_splits"
@@ -115,3 +116,15 @@ class ActivitySplit(Base):
 
     # 관계 설정
     activity = relationship("Activity", back_populates="splits")
+
+class ActivityFeedback(Base):
+    __tablename__ = "activity_feedbacks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    activity_id = Column(Integer, ForeignKey("activities.activity_id"))
+    created_at = Column(DateTime)
+    feedback_data = Column(String)
+    
+    user = relationship("User", back_populates="activity_feedbacks") 
+    activity = relationship("Activity", back_populates="activity_feedbacks") 
