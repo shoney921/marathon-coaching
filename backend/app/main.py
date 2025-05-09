@@ -669,3 +669,26 @@ async def get_activities_laps(user_id: int, db: Session = Depends(get_db)):
 
     return response
     
+@app.get("/activities/summary/user/{user_id}")
+async def get_activity_summary(user_id: int, db: Session = Depends(get_db)):
+    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
+    
+    total_activities = len(activities)
+    total_distance = sum(activity.distance for activity in activities) / 1000  # m -> km
+    total_duration = sum(activity.duration for activity in activities)  # seconds
+    
+    # 평균 페이스 계산
+    if total_distance > 0:
+        avg_speed = (total_distance * 1000) / total_duration  # m/s
+        avg_speed_kmh = avg_speed * 3.6  # km/h
+        avg_pace = speed_to_pace(avg_speed_kmh)  # min/km
+    else:
+        avg_pace = "00:00"
+
+    return {
+        "total_activities": total_activities,
+        "total_distance": round(total_distance, 2),  # km
+        "total_duration": format_duration(total_duration),  # HH:MM:SS
+        "average_pace": avg_pace  # min/km
+    }
+
