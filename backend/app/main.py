@@ -640,10 +640,10 @@ def speed_to_pace(speed_kmh: float) -> str:
     seconds_per_km = 3600 / speed_kmh  # 3600초(1시간) / 속도
     return format_pace(seconds_per_km)
 
-## ㅡ
+## 랩 데이터 조회
 @app.get("/activities/laps/user/{user_id}")
 async def get_activities_laps(user_id: int, db: Session = Depends(get_db)):
-    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
+    activities = db.query(Activity).filter(Activity.user_id == user_id).order_by(Activity.start_time_local.desc()).all()
 
     response = []
 
