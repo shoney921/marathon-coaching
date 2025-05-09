@@ -156,20 +156,20 @@ with tab5:
         st.subheader(f"Total {activity_summary['total_distance']} km")
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
-            st.write(f"러닝 : {activity_summary['total_activities']}")
+            st.write(f"시간 : {format_duration(activity_summary['total_duration'])}")
         with col2:
             st.write("")
         with col3:
-            st.write(f"시간 : {format_duration(activity_summary['total_duration'])}")
+            st.write(f"평균 페이스 : {activity_summary['average_pace']}")
         with col4:
             st.write("")
         with col5:
-            st.write(f"평균 페이스 : {activity_summary['average_pace']}")
+            st.write(f"러닝 : {activity_summary['total_activities']}")
     else:
         st.info("활동 기록이 없습니다.")
 
     st.write("---")
-    st.subheader("활동 기록 목록")
+    st.write("#### 활동 기록 목록")
     # 활동 기록 목록 표시
     activities = get_activities_laps()
     if activities:
@@ -182,7 +182,7 @@ with tab5:
             padded_activity_name = f"⠀⠀⠀##{activity['activity_name']}{'⠀' * (40 - len(activity['activity_name']))}"
             
             with st.expander(f"[{formatted_date}] {padded_activity_name} ({activity['distance']}km | {activity['duration']})"):
-                st.subheader(f"{activity['activity_name']} - {formatted_date}")
+                st.write(f"#### {activity['activity_name']} - {formatted_date}")
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"총 거리: {activity['distance']}km")
