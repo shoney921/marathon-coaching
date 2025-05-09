@@ -3,13 +3,14 @@ import requests
 import os
 
 # API 엔드포인트 설정
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
 
 # 페이지 설정
 st.set_page_config(
     page_title="마라톤 코칭 시스템 - 회원가입",
     page_icon="🏃",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 def register_user(user_data):
@@ -59,7 +60,7 @@ def main():
             
             if register_user(user_data):
                 st.success("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.")
-                st.switch_page("login.py")
+                st.switch_page("pages/login.py")
             else:
                 st.error("회원가입에 실패했습니다. 다시 시도해주세요.")
     

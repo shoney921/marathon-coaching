@@ -4,13 +4,14 @@ import os
 from datetime import datetime, timedelta
 
 # API 엔드포인트 설정
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
 
 # 페이지 설정
 st.set_page_config(
     page_title="마라톤 코칭 시스템 - 로그인",
     page_icon="🏃",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 def login_user(email, password):
