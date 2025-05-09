@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +9,7 @@ from typing import List
 from garminconnect import Garmin
 from pydantic import BaseModel
 import os
+import time
 
 from app.models.base import Base
 from app.models.user import User
@@ -16,6 +17,21 @@ from app.models.training import TrainingLog, SleepLog, RaceGoal
 from app.models.feedback import AIFeedback
 from app.models.activity import Activity, ActivitySplit
 from tasks.coaching import request_coaching
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('api.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class GarminSyncRequest(BaseModel):
+    email: str
+    password: str
 
 # 데이터베이스 설정
 SQLALCHEMY_DATABASE_URL = "sqlite:///./marathon.db?check_same_thread=False"
@@ -40,6 +56,62 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# 요청/응답 로깅 미들웨어
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # 요청 시작 시간
+    start_time = time.time()
+    
+    # 요청 정보 로깅
+    request_body = None
+    try:
+        request_body = await request.body()
+        if request_body:
+            request_body = request_body.decode()
+    except:
+        pass
+    
+    logger.info(f"""
+    Request:
+    Method: {request.method}
+    URL: {request.url}
+    Headers: {dict(request.headers)}
+    Body: {request_body}
+    """)
+    
+    # 응답 처리
+    response = await call_next(request)
+    
+    # 응답 시간 계산
+    process_time = time.time() - start_time
+    
+    # 응답 본문 가져오기
+    response_body = b""
+    async for chunk in response.body_iterator:
+        response_body += chunk
+    
+    # 응답 본문 디코딩
+    try:
+        response_body = response_body.decode()
+    except:
+        response_body = str(response_body)
+    
+    # 응답 정보 로깅
+    logger.info(f"""
+    Response:
+    Status Code: {response.status_code}
+    Process Time: {process_time:.2f} seconds
+    Body: {response_body}
+    """)
+    
+    # 응답 본문을 다시 설정
+    return Response(
+        content=response_body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type
+    )
 
 @app.post("/users/")
 async def create_user(user_data: dict, db: Session = Depends(get_db)):
@@ -128,7 +200,6 @@ async def login(user_data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"message": "Login successful", "user": user, "token": "1234567890"}
 
-
 @app.post("/auth/register/")
 async def register(user_data: dict, db: Session = Depends(get_db)):
 
@@ -146,65 +217,6 @@ async def register(user_data: dict, db: Session = Depends(get_db)):
     return {"message": "Registration successful", "user_id": user.id}
 
 @app.get("/activities/user/{user_id}")
-async def get_activities(user_id: int, db: Session = Depends(get_db)):
-    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
-    return [{
-        "id": activity.id,
-        "activity_id": activity.activity_id,
-        "user_id": activity.user_id,
-        "activity_name": activity.activity_name,
-        "start_time_local": activity.start_time_local,
-        "start_time_gmt": activity.start_time_gmt,
-        "end_time_gmt": activity.end_time_gmt,
-        "activity_type": activity.activity_type,
-        "event_type": activity.event_type,
-        "distance": activity.distance,
-        "duration": activity.duration,
-        "elapsed_duration": activity.elapsed_duration,
-        "moving_duration": activity.moving_duration,
-        "elevation_gain": activity.elevation_gain,
-        "elevation_loss": activity.elevation_loss,
-        "min_elevation": activity.min_elevation,
-        "max_elevation": activity.max_elevation,
-        "elevation_corrected": activity.elevation_corrected,
-        "average_speed": activity.average_speed,
-        "max_speed": activity.max_speed,
-        "start_latitude": activity.start_latitude,
-        "start_longitude": activity.start_longitude,
-        "end_latitude": activity.end_latitude,
-        "end_longitude": activity.end_longitude,
-        "average_hr": activity.average_hr,
-        "max_hr": activity.max_hr,
-        "hr_time_in_zones": activity.hr_time_in_zones,
-        "avg_power": activity.avg_power,
-        "max_power": activity.max_power,
-        "power_time_in_zones": activity.power_time_in_zones,
-        "aerobic_training_effect": activity.aerobic_training_effect,
-        "anaerobic_training_effect": activity.anaerobic_training_effect,
-        "training_effect_label": activity.training_effect_label,
-        "vo2max_value": activity.vo2max_value,
-        "average_cadence": activity.average_cadence,
-        "max_cadence": activity.max_cadence,
-        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
-        "avg_ground_contact_time": activity.avg_ground_contact_time,
-        "avg_stride_length": activity.avg_stride_length,
-        "calories": activity.calories,
-        "water_estimated": activity.water_estimated,
-        "activity_training_load": activity.activity_training_load,
-        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
-        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
-        "steps": activity.steps,
-        "time_zone_id": activity.time_zone_id,
-        "sport_type_id": activity.sport_type_id,
-        "device_id": activity.device_id,
-        "manufacturer": activity.manufacturer,
-        "lap_count": activity.lap_count,
-        "privacy": activity.privacy,
-        "favorite": activity.favorite,
-        "manual_activity": activity.manual_activity
-    } for activity in activities]
-
-@app.get("/activities/{user_id}", response_model=List[dict])
 async def get_activities(user_id: int, db: Session = Depends(get_db)):
     activities = db.query(Activity).filter(Activity.user_id == user_id).all()
     return [{
@@ -323,14 +335,6 @@ async def get_activity(activity_id: int, db: Session = Depends(get_db)):
         "favorite": activity.favorite,
         "manual_activity": activity.manual_activity
     }
-
-class GarminSyncRequest(BaseModel):
-    email: str
-    password: str
-
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def parse_garmin_datetime(date_str: str) -> datetime:
     """
@@ -589,3 +593,99 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
         logger.error(f"Error during sync process: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def format_duration(seconds: float) -> str:
+    """
+    초를 HH:MM:SS.mmm 형식으로 변환
+    
+    Args:
+        seconds: 소요 시간(초)
+    
+    Returns:
+        "HH:MM:SS.mmm" 형식의 문자열
+    """
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds_remainder = seconds % 60
+    milliseconds = int((seconds_remainder - int(seconds_remainder)) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{int(seconds_remainder):02d}.{milliseconds:03d}"
+
+def format_pace(seconds_per_km: float) -> str:
+    """
+    초/km를 분:초.mmm/km 형식으로 변환
+    
+    Args:
+        seconds_per_km: 1km당 소요 시간(초)
+    
+    Returns:
+        "분:초.mmm/km" 형식의 문자열
+    """
+    minutes = int(seconds_per_km // 60)
+    seconds_remainder = seconds_per_km % 60
+    seconds = int(seconds_remainder)
+    milliseconds = int((seconds_remainder - seconds) * 1000)
+    return f"{minutes}:{seconds:02d}.{milliseconds:03d}"
+
+def speed_to_pace(speed_kmh: float) -> str:
+    """
+    속도(km/h)를 페이스(분:초.mmm/km)로 변환
+    
+    Args:
+        speed_kmh: 시간당 킬로미터(km/h)
+    
+    Returns:
+        "분:초.mmm/km" 형식의 문자열
+    """
+    if speed_kmh <= 0:
+        return "0:00.000"
+    seconds_per_km = 3600 / speed_kmh  # 3600초(1시간) / 속도
+    return format_pace(seconds_per_km)
+
+## ㅡ
+@app.get("/activities/laps/user/{user_id}")
+async def get_activities_laps(user_id: int, db: Session = Depends(get_db)):
+    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
+
+    response = []
+
+    for activity in activities: 
+        laps = db.query(ActivitySplit).filter(ActivitySplit.activity_id == activity.activity_id).all()
+        laps_data = []
+        for lap in laps:
+            # 거리: m -> km, 속도: m/s -> km/h, 시간: s -> min
+            speed_kmh = lap.average_speed * 3.6  # m/s -> km/h
+            max_speed_kmh = lap.max_speed * 3.6  # m/s -> km/h
+            laps_data.append({
+                "lap_index": lap.lap_index,
+                "distance": round(lap.distance / 1000, 2),  # km
+                "duration": format_duration(lap.duration),  # HH:MM:SS.mmm
+                "average_speed": round(speed_kmh, 2),  # km/h
+                "max_speed": round(max_speed_kmh, 2),  # km/h
+                "average_pace": speed_to_pace(speed_kmh),  # 분:초.mmm/km
+                "max_pace": speed_to_pace(max_speed_kmh),  # 분:초.mmm/km
+                "average_hr": lap.average_hr,              # bpm
+                "max_hr": lap.max_hr,                      # bpm
+                "average_run_cadence": lap.average_run_cadence  # spm
+            })
+        
+        # 거리: m -> km, 속도: m/s -> km/h, 시간: s -> min
+        speed_kmh = activity.average_speed * 3.6  # m/s -> km/h
+        max_speed_kmh = activity.max_speed * 3.6  # m/s -> km/h
+        response.append({
+            "id": activity.id,
+            "activity_id": activity.activity_id,
+            "activity_name": activity.activity_name,
+            "local_start_time": activity.start_time_local,
+            "distance": round(activity.distance / 1000, 2),  # km
+            "duration": format_duration(activity.duration),  # HH:MM:SS.mmm
+            "average_speed": round(speed_kmh, 2),  # km/h
+            "max_speed": round(max_speed_kmh, 2),  # km/h
+            "average_pace": speed_to_pace(speed_kmh),  # 분:초.mmm/km
+            "max_pace": speed_to_pace(max_speed_kmh),  # 분:초.mmm/km
+            "average_cadence": activity.average_cadence,    # spm
+            "average_hr": activity.average_hr,              # bpm
+            "max_hr": activity.max_hr,                      # bpm
+            "laps": laps_data
+        })
+
+    return response
+    
