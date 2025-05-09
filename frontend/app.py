@@ -154,12 +154,16 @@ with tab5:
     activity_summary = get_activity_summary()
     if activity_summary:
         st.subheader(f"Total {activity_summary['total_distance']} km")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.write(f"러닝 : {activity_summary['total_activities']}")
         with col2:
-            st.write(f"시간 : {format_duration(activity_summary['total_duration'])}")
+            st.write("")
         with col3:
+            st.write(f"시간 : {format_duration(activity_summary['total_duration'])}")
+        with col4:
+            st.write("")
+        with col5:
             st.write(f"평균 페이스 : {activity_summary['average_pace']}")
     else:
         st.info("활동 기록이 없습니다.")
@@ -174,7 +178,10 @@ with tab5:
             activity_date = datetime.fromisoformat(activity['local_start_time'].replace('Z', '+00:00'))
             formatted_date = activity_date.strftime('%Y년 %m월 %d일 - %H시 %M분')
             
-            with st.expander(f"[{formatted_date}][{activity['activity_name']}]         ({activity['distance']}km - {activity['duration']})"):
+            # 활동명을 25자로 고정하고 남는 공간을 특수 공백문자로 채움
+            padded_activity_name = f"⠀⠀⠀##{activity['activity_name']}{'⠀' * (40 - len(activity['activity_name']))}"
+            
+            with st.expander(f"[{formatted_date}] {padded_activity_name} ({activity['distance']}km | {activity['duration']})"):
                 st.subheader(f"{activity['activity_name']} - {formatted_date}")
                 col1, col2 = st.columns(2)
                 with col1:
