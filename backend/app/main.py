@@ -8,12 +8,13 @@ import logging
 from typing import List
 from garminconnect import Garmin
 from pydantic import BaseModel
+import os
 
 from app.models.base import Base
 from app.models.user import User
 from app.models.training import TrainingLog, SleepLog, RaceGoal
 from app.models.feedback import AIFeedback
-from app.models.activity import Activity
+from app.models.activity import Activity, ActivitySplit
 from tasks.coaching import request_coaching
 
 # 데이터베이스 설정
@@ -331,6 +332,109 @@ class GarminSyncRequest(BaseModel):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def parse_garmin_datetime(date_str: str) -> datetime:
+    """
+    가민에서 제공하는 날짜 문자열을 datetime 객체로 변환
+    
+    Args:
+        date_str: 가민 날짜 문자열 (예: '2025-05-07T22:20:30.0')
+    
+    Returns:
+        datetime 객체
+    """
+    try:
+        # 마지막의 .0을 제거하고 파싱
+        if date_str.endswith('.0'):
+            date_str = date_str[:-2]
+        return datetime.fromisoformat(date_str)
+    except ValueError as e:
+        logger.error(f"Error parsing date {date_str}: {str(e)}")
+        raise
+
+@app.post("/process-activity-splits/{activity_id}")
+async def process_activity_splits(activity_id: int, user_data: GarminSyncRequest, db: Session = Depends(get_db)):
+    try:
+        # Garmin Connect 클라이언트 초기화 및 로그인
+        client = Garmin(user_data.email, user_data.password)
+        client.login()
+
+        logger.info(f"activity_id {activity_id}")        
+        logger.info(f"activity_id type {type(activity_id)}")
+        # 활동이 존재하는지 확인
+        activity = db.query(Activity).filter(Activity.activity_id == str(activity_id)).first()
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+        
+        logger.info(f"activity {str(activity.activity_id)}")
+            
+        # 랩 데이터 처리
+        process_activity_splits(client, str(activity.activity_id), db, logger)
+        return {"message": "Activity splits processed successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error in process_activity_splits endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def process_activity_splits(client, activity_id: str, db: Session, logger) -> None:
+    """
+    가민 활동의 랩 데이터를 처리하고 저장하는 메서드
+    
+    Args:
+        client: 가민 API 클라이언트
+        activity_id: 활동 ID
+        db: 데이터베이스 세션
+        logger: 로거
+    """
+    try:
+        splits_data = client.get_activity_splits(activity_id)
+        logger.info(f"Fetched splits data for activity {activity_id}")
+        
+        if not splits_data or 'lapDTOs' not in splits_data:
+            logger.warning(f"No lap data found for activity {activity_id}")
+            return
+
+        for lap in splits_data['lapDTOs']:
+            try:
+                split = ActivitySplit(
+                    activity_id=activity_id,
+                    lap_index=lap.get('lapIndex'),
+                    start_time_gmt=parse_garmin_datetime(lap.get('startTimeGMT')),
+                    distance=lap.get('distance'),
+                    duration=lap.get('duration'),
+                    moving_duration=lap.get('movingDuration'),
+                    average_speed=lap.get('averageSpeed'),
+                    max_speed=lap.get('maxSpeed'),
+                    average_hr=lap.get('averageHR'),
+                    max_hr=lap.get('maxHR'),
+                    average_run_cadence=lap.get('averageRunCadence'),
+                    max_run_cadence=lap.get('maxRunCadence'),
+                    average_power=lap.get('averagePower'),
+                    max_power=lap.get('maxPower'),
+                    ground_contact_time=lap.get('groundContactTime'),
+                    stride_length=lap.get('strideLength'),
+                    vertical_oscillation=lap.get('verticalOscillation'),
+                    vertical_ratio=lap.get('verticalRatio'),
+                    calories=lap.get('calories'),
+                    elevation_gain=lap.get('elevationGain'),
+                    elevation_loss=lap.get('elevationLoss'),
+                    max_elevation=lap.get('maxElevation'),
+                    min_elevation=lap.get('minElevation'),
+                    start_latitude=lap.get('startLatitude'),
+                    start_longitude=lap.get('startLongitude'),
+                    end_latitude=lap.get('endLatitude'),
+                    end_longitude=lap.get('endLongitude')
+                )
+                db.add(split)
+                db.commit()
+                logger.info(f"Successfully added split {lap.get('lapIndex')} for activity {activity_id}")
+            except Exception as e:
+                logger.error(f"Error processing lap data: {str(e)}")
+                db.rollback()
+                continue
+    except Exception as e:
+        logger.error(f"Error fetching splits data: {str(e)}")
+        raise
+
 @app.post("/sync-garmin-activities/{user_id}")
 async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db: Session = Depends(get_db)):
     try:
@@ -461,6 +565,11 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
                 )
                 
                 db.add(activity)
+                db.flush()  # ID를 얻기 위해 flush
+                
+                # 랩 데이터 가져오기
+                process_activity_splits(client, activity.activity_id, db, logger)
+                
                 synced_count += 1
                 logger.info(f"Successfully added activity {activity_data.get('activityId')}")
                 

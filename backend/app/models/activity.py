@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from .base import Base
 
 class Activity(Base):
@@ -76,3 +77,41 @@ class Activity(Base):
     privacy = Column(JSON)  # 공개/비공개 설정 정보
     favorite = Column(Boolean, default=False)  # 즐겨찾기 여부
     manual_activity = Column(Boolean, default=False)  # 수동으로 추가된 활동인지 여부
+
+    # 관계 설정
+    splits = relationship("ActivitySplit", back_populates="activity")
+
+class ActivitySplit(Base):
+    __tablename__ = "activity_splits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    activity_id = Column(Integer, ForeignKey("activities.id"))
+    lap_index = Column(Integer)
+    start_time_gmt = Column(DateTime)
+    distance = Column(Float)  # 미터 단위
+    duration = Column(Float)  # 초 단위
+    moving_duration = Column(Float)  # 초 단위
+    average_speed = Column(Float)  # m/s
+    max_speed = Column(Float)  # m/s
+    average_hr = Column(Float)  # bpm
+    max_hr = Column(Float)  # bpm
+    average_run_cadence = Column(Float)  # spm
+    max_run_cadence = Column(Float)  # spm
+    average_power = Column(Float)  # watts
+    max_power = Column(Float)  # watts
+    ground_contact_time = Column(Float)  # ms
+    stride_length = Column(Float)  # cm
+    vertical_oscillation = Column(Float)  # cm
+    vertical_ratio = Column(Float)  # %
+    calories = Column(Float)
+    elevation_gain = Column(Float)  # m
+    elevation_loss = Column(Float)  # m
+    max_elevation = Column(Float)  # m
+    min_elevation = Column(Float)  # m
+    start_latitude = Column(Float)
+    start_longitude = Column(Float)
+    end_latitude = Column(Float)
+    end_longitude = Column(Float)
+
+    # 관계 설정
+    activity = relationship("Activity", back_populates="splits")
