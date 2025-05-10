@@ -290,26 +290,70 @@ with tab5:
                 # 활동에 대한 댓글 입력
                 st.write("---")
                 st.write("💬 자신의 활동에 댓글을 남겨보세요(AI에게 핑계를 전달할 수 있어요)")
-                # 기존 댓글들도 랜더링 되도록 해야한다
-                # activity_comments = activity['comments']
-                # for comment in activity_comments:
-                #     st.write(f"💬 {comment['comment']}")
+                
+                # 기존 댓글들 표시
+                if activity['comments']:
+                    st.markdown("""
+                        <style>
+                        .comment-box {
+                            background-color: #f0f2f6;
+                            padding: 10px;
+                            border-radius: 5px;
+                            margin: 5px 0;
+                            border-left: 3px solid #4CAF50;
+                            position: relative;
+                        }
+                        .delete-button {
+                            position: absolute;
+                            top: 5px;
+                            right: 5px;
+                            color: #ff4444;
+                            cursor: pointer;
+                            font-size: 0.8em;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                    
+                    for comment in activity['comments']:
+                        col1, col2 = st.columns([0.95, 0.05])
+                        with col1:
+                            st.markdown(f"""
+                                <div class="comment-box">
+                                    <div style="color: #666; font-size: 0.8em;">{comment['created_at']}</div>
+                                    <div style="margin-top: 5px;">{comment['comment']}</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with col2:
+                            if st.button("🗑️", key=f"delete_comment_{comment['id']}"):
+                                try:
+                                    response = requests.delete(
+                                        f"{API_BASE_URL}/activities/comments/{comment['id']}",
+                                        headers={"Authorization": f"Bearer {st.session_state.token}"}
+                                    )
+                                    if response.status_code == 200:
+                                        st.success("댓글이 삭제되었습니다.")
+                                        st.rerun()
+                                    else:
+                                        st.error("댓글 삭제에 실패했습니다.")
+                                except Exception as e:
+                                    st.error(f"댓글 삭제 중 오류가 발생했습니다: {str(e)}")
+                
+                # 새 댓글 입력
                 user_comment = st.text_area("", placeholder="이 활동에 대한 생각을 공유해보세요...", key=f"comment_{activity['activity_id']}")
                 
                 # 댓글 제출 버튼
                 if st.button("댓글 작성", key=f"submit_comment_{activity['activity_id']}"):
                     if user_comment:
-                        # TODO: 실제 API 엔드포인트로 변경 필요
-                        # response = requests.post(
-                        #     f"{API_BASE_URL}/activities/{activity['activity_id']}/comment",
-                        #     headers={"Authorization": f"Bearer {st.session_state.token}"},
-                        #     json={"comment": user_comment}
-                        # )
-                        # if response.status_code == 200:
-                        #     st.success("댓글이 성공적으로 저장되었습니다.")
-                        # else:
-                        #     st.error("댓글 저장에 실패했습니다.")
-                        st.success("댓글이 성공적으로 저장되었습니다.")  # 임시 성공 메시지
+                        response = requests.post(
+                            f"{API_BASE_URL}/activities/comments/",
+                            headers={"Authorization": f"Bearer {st.session_state.token}"},
+                            json={"activity_id": activity['activity_id'], "comment": user_comment}
+                        )
+                        if response.status_code == 200:
+                            st.success("댓글이 성공적으로 저장되었습니다.")
+                            st.rerun()  # 화면 새로고침
+                        else:
+                            st.error("댓글 저장에 실패했습니다.")
                     else:
                         st.warning("댓글을 입력해주세요.")
 
