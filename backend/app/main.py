@@ -10,11 +10,13 @@ from garminconnect import Garmin
 from pydantic import BaseModel
 import os
 import time
+from sqlalchemy.orm import relationship
 
 from app.models.base import Base
 from app.models.user import User
 from app.models.training import TrainingLog, SleepLog, RaceGoal
-from app.models.activity import Activity, ActivitySplit
+from app.models.activity import Activity, ActivityComment, ActivitySplit
+from app.services.activity_service import ActivityService
 # from tasks.coaching import request_coaching
 
 # 로깅 설정
@@ -198,123 +200,33 @@ async def register(user_data: dict, db: Session = Depends(get_db)):
 
 @app.get("/activities/user/{user_id}")
 async def get_activities(user_id: int, db: Session = Depends(get_db)):
-    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
-    return [{
-        "id": activity.id,
-        "activity_id": activity.activity_id,
-        "user_id": activity.user_id,
-        "activity_name": activity.activity_name,
-        "start_time_local": activity.start_time_local,
-        "start_time_gmt": activity.start_time_gmt,
-        "end_time_gmt": activity.end_time_gmt,
-        "activity_type": activity.activity_type,
-        "event_type": activity.event_type,
-        "distance": activity.distance,
-        "duration": activity.duration,
-        "elapsed_duration": activity.elapsed_duration,
-        "moving_duration": activity.moving_duration,
-        "elevation_gain": activity.elevation_gain,
-        "elevation_loss": activity.elevation_loss,
-        "min_elevation": activity.min_elevation,
-        "max_elevation": activity.max_elevation,
-        "elevation_corrected": activity.elevation_corrected,
-        "average_speed": activity.average_speed,
-        "max_speed": activity.max_speed,
-        "start_latitude": activity.start_latitude,
-        "start_longitude": activity.start_longitude,
-        "end_latitude": activity.end_latitude,
-        "end_longitude": activity.end_longitude,
-        "average_hr": activity.average_hr,
-        "max_hr": activity.max_hr,
-        "hr_time_in_zones": activity.hr_time_in_zones,
-        "avg_power": activity.avg_power,
-        "max_power": activity.max_power,
-        "power_time_in_zones": activity.power_time_in_zones,
-        "aerobic_training_effect": activity.aerobic_training_effect,
-        "anaerobic_training_effect": activity.anaerobic_training_effect,
-        "training_effect_label": activity.training_effect_label,
-        "vo2max_value": activity.vo2max_value,
-        "average_cadence": activity.average_cadence,
-        "max_cadence": activity.max_cadence,
-        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
-        "avg_ground_contact_time": activity.avg_ground_contact_time,
-        "avg_stride_length": activity.avg_stride_length,
-        "calories": activity.calories,
-        "water_estimated": activity.water_estimated,
-        "activity_training_load": activity.activity_training_load,
-        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
-        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
-        "steps": activity.steps,
-        "time_zone_id": activity.time_zone_id,
-        "sport_type_id": activity.sport_type_id,
-        "device_id": activity.device_id,
-        "manufacturer": activity.manufacturer,
-        "lap_count": activity.lap_count,
-        "privacy": activity.privacy,
-        "favorite": activity.favorite,
-        "manual_activity": activity.manual_activity
-    } for activity in activities]
+    activity_service = ActivityService(db)
+    return activity_service.get_activities(user_id)
 
 @app.get("/activities/{activity_id}")
 async def get_activity(activity_id: int, db: Session = Depends(get_db)):
-    activity = db.query(Activity).filter(Activity.activity_id == activity_id).first()
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return {
-        "id": activity.id,
-        "activity_id": activity.activity_id,
-        "user_id": activity.user_id,
-        "activity_name": activity.activity_name,
-        "start_time_local": activity.start_time_local,
-        "start_time_gmt": activity.start_time_gmt,
-        "end_time_gmt": activity.end_time_gmt,
-        "activity_type": activity.activity_type,
-        "event_type": activity.event_type,
-        "distance": activity.distance,
-        "duration": activity.duration,
-        "elapsed_duration": activity.elapsed_duration,
-        "moving_duration": activity.moving_duration,
-        "elevation_gain": activity.elevation_gain,
-        "elevation_loss": activity.elevation_loss,
-        "min_elevation": activity.min_elevation,
-        "max_elevation": activity.max_elevation,
-        "elevation_corrected": activity.elevation_corrected,
-        "average_speed": activity.average_speed,
-        "max_speed": activity.max_speed,
-        "start_latitude": activity.start_latitude,
-        "start_longitude": activity.start_longitude,
-        "end_latitude": activity.end_latitude,
-        "end_longitude": activity.end_longitude,
-        "average_hr": activity.average_hr,
-        "max_hr": activity.max_hr,
-        "hr_time_in_zones": activity.hr_time_in_zones,
-        "avg_power": activity.avg_power,
-        "max_power": activity.max_power,
-        "power_time_in_zones": activity.power_time_in_zones,
-        "aerobic_training_effect": activity.aerobic_training_effect,
-        "anaerobic_training_effect": activity.anaerobic_training_effect,
-        "training_effect_label": activity.training_effect_label,
-        "vo2max_value": activity.vo2max_value,
-        "average_cadence": activity.average_cadence,
-        "max_cadence": activity.max_cadence,
-        "avg_vertical_oscillation": activity.avg_vertical_oscillation,
-        "avg_ground_contact_time": activity.avg_ground_contact_time,
-        "avg_stride_length": activity.avg_stride_length,
-        "calories": activity.calories,
-        "water_estimated": activity.water_estimated,
-        "activity_training_load": activity.activity_training_load,
-        "moderate_intensity_minutes": activity.moderate_intensity_minutes,
-        "vigorous_intensity_minutes": activity.vigorous_intensity_minutes,
-        "steps": activity.steps,
-        "time_zone_id": activity.time_zone_id,
-        "sport_type_id": activity.sport_type_id,
-        "device_id": activity.device_id,
-        "manufacturer": activity.manufacturer,
-        "lap_count": activity.lap_count,
-        "privacy": activity.privacy,
-        "favorite": activity.favorite,
-        "manual_activity": activity.manual_activity
-    }
+    activity_service = ActivityService(db)
+    return activity_service.get_activity(activity_id)
+
+@app.get("/activities/laps/user/{user_id}")
+async def get_activities_laps_with_comments(user_id: int, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.get_activities_laps_with_comments(user_id)
+
+@app.get("/activities/summary/user/{user_id}")
+async def get_activity_summary(user_id: int, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.get_activity_summary(user_id)
+
+@app.post("/activities/comments/")
+async def create_activity_comment(comment_data: dict, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.create_activity_comment(comment_data)
+
+@app.delete("/activities/comments/{comment_id}")
+def delete_activity_comment(comment_id: int, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.delete_activity_comment(comment_id)
 
 def parse_garmin_datetime(date_str: str) -> datetime:
     """
@@ -350,74 +262,62 @@ async def process_activity_splits(activity_id: int, user_data: GarminSyncRequest
             raise HTTPException(status_code=404, detail="Activity not found")
         
         logger.info(f"activity {str(activity.activity_id)}")
-            
-        # 랩 데이터 처리
-        process_activity_splits(client, str(activity.activity_id), db, logger)
+        
+        # ActivityService를 사용하여 랩 데이터 처리
+        activity_service = ActivityService(db)
+        activity_service.process_activity_splits(client, str(activity.activity_id))
         return {"message": "Activity splits processed successfully"}
         
     except Exception as e:
         logger.error(f"Error in process_activity_splits endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def process_activity_splits(client, activity_id: str, db: Session, logger) -> None:
+def format_duration(seconds: float) -> str:
     """
-    가민 활동의 랩 데이터를 처리하고 저장하는 메서드
+    초를 HH:MM:SS.mmm 형식으로 변환
     
     Args:
-        client: 가민 API 클라이언트
-        activity_id: 활동 ID
-        db: 데이터베이스 세션
-        logger: 로거
+        seconds: 소요 시간(초)
+    
+    Returns:
+        "HH:MM:SS.mmm" 형식의 문자열
     """
-    try:
-        splits_data = client.get_activity_splits(activity_id)
-        logger.info(f"Fetched splits data for activity {activity_id}")
-        
-        if not splits_data or 'lapDTOs' not in splits_data:
-            logger.warning(f"No lap data found for activity {activity_id}")
-            return
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds_remainder = seconds % 60
+    milliseconds = int((seconds_remainder - int(seconds_remainder)) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{int(seconds_remainder):02d}.{milliseconds:03d}"
 
-        for lap in splits_data['lapDTOs']:
-            try:
-                split = ActivitySplit(
-                    activity_id=activity_id,
-                    lap_index=lap.get('lapIndex'),
-                    start_time_gmt=parse_garmin_datetime(lap.get('startTimeGMT')),
-                    distance=lap.get('distance'),
-                    duration=lap.get('duration'),
-                    moving_duration=lap.get('movingDuration'),
-                    average_speed=lap.get('averageSpeed'),
-                    max_speed=lap.get('maxSpeed'),
-                    average_hr=lap.get('averageHR'),
-                    max_hr=lap.get('maxHR'),
-                    average_run_cadence=lap.get('averageRunCadence'),
-                    max_run_cadence=lap.get('maxRunCadence'),
-                    average_power=lap.get('averagePower'),
-                    max_power=lap.get('maxPower'),
-                    ground_contact_time=lap.get('groundContactTime'),
-                    stride_length=lap.get('strideLength'),
-                    vertical_oscillation=lap.get('verticalOscillation'),
-                    vertical_ratio=lap.get('verticalRatio'),
-                    calories=lap.get('calories'),
-                    elevation_gain=lap.get('elevationGain'),
-                    elevation_loss=lap.get('elevationLoss'),
-                    max_elevation=lap.get('maxElevation'),
-                    min_elevation=lap.get('minElevation'),
-                    start_latitude=lap.get('startLatitude'),
-                    start_longitude=lap.get('startLongitude'),
-                    end_latitude=lap.get('endLatitude'),
-                    end_longitude=lap.get('endLongitude')
-                )
-                db.add(split)
-                db.commit()
-                logger.info(f"Successfully added split {lap.get('lapIndex')} for activity {activity_id}")
-            except Exception as e:
-                logger.error(f"Error processing lap data: {str(e)}")
-                db.rollback()
-                continue
-    except Exception as e:
-        logger.error(f"Error fetching splits data: {str(e)}")
-        raise
+def format_pace(seconds_per_km: float) -> str:
+    """
+    초/km를 분:초.mmm/km 형식으로 변환
+    
+    Args:
+        seconds_per_km: 1km당 소요 시간(초)
+    
+    Returns:
+        "분:초.mmm/km" 형식의 문자열
+    """
+    minutes = int(seconds_per_km // 60)
+    seconds_remainder = seconds_per_km % 60
+    seconds = int(seconds_remainder)
+    milliseconds = int((seconds_remainder - seconds) * 1000)
+    return f"{minutes}:{seconds:02d}.{milliseconds:03d}"
+
+def speed_to_pace(speed_kmh: float) -> str:
+    """
+    속도(km/h)를 페이스(분:초.mmm/km)로 변환
+    
+    Args:
+        speed_kmh: 시간당 킬로미터(km/h)
+    
+    Returns:
+        "분:초.mmm/km" 형식의 문자열
+    """
+    if speed_kmh <= 0:
+        return "0:00.000"
+    seconds_per_km = 3600 / speed_kmh  # 3600초(1시간) / 속도
+    return format_pace(seconds_per_km)
 
 @app.post("/sync-garmin-activities/{user_id}")
 async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db: Session = Depends(get_db)):
@@ -572,123 +472,3 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
         db.rollback()
         logger.error(f"Error during sync process: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-def format_duration(seconds: float) -> str:
-    """
-    초를 HH:MM:SS.mmm 형식으로 변환
-    
-    Args:
-        seconds: 소요 시간(초)
-    
-    Returns:
-        "HH:MM:SS.mmm" 형식의 문자열
-    """
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    seconds_remainder = seconds % 60
-    milliseconds = int((seconds_remainder - int(seconds_remainder)) * 1000)
-    return f"{hours:02d}:{minutes:02d}:{int(seconds_remainder):02d}.{milliseconds:03d}"
-
-def format_pace(seconds_per_km: float) -> str:
-    """
-    초/km를 분:초.mmm/km 형식으로 변환
-    
-    Args:
-        seconds_per_km: 1km당 소요 시간(초)
-    
-    Returns:
-        "분:초.mmm/km" 형식의 문자열
-    """
-    minutes = int(seconds_per_km // 60)
-    seconds_remainder = seconds_per_km % 60
-    seconds = int(seconds_remainder)
-    milliseconds = int((seconds_remainder - seconds) * 1000)
-    return f"{minutes}:{seconds:02d}.{milliseconds:03d}"
-
-def speed_to_pace(speed_kmh: float) -> str:
-    """
-    속도(km/h)를 페이스(분:초.mmm/km)로 변환
-    
-    Args:
-        speed_kmh: 시간당 킬로미터(km/h)
-    
-    Returns:
-        "분:초.mmm/km" 형식의 문자열
-    """
-    if speed_kmh <= 0:
-        return "0:00.000"
-    seconds_per_km = 3600 / speed_kmh  # 3600초(1시간) / 속도
-    return format_pace(seconds_per_km)
-
-## 랩 데이터 조회
-@app.get("/activities/laps/user/{user_id}")
-async def get_activities_laps(user_id: int, db: Session = Depends(get_db)):
-    activities = db.query(Activity).filter(Activity.user_id == user_id).order_by(Activity.start_time_local.desc()).all()
-
-    response = []
-
-    for activity in activities: 
-        laps = db.query(ActivitySplit).filter(ActivitySplit.activity_id == activity.activity_id).all()
-        laps_data = []
-        for lap in laps:
-            # 거리: m -> km, 속도: m/s -> km/h, 시간: s -> min
-            speed_kmh = lap.average_speed * 3.6  # m/s -> km/h
-            max_speed_kmh = lap.max_speed * 3.6  # m/s -> km/h
-            laps_data.append({
-                "lap_index": lap.lap_index,
-                "distance": round(lap.distance / 1000, 2),  # km
-                "duration": format_duration(lap.duration),  # HH:MM:SS.mmm
-                "average_speed": round(speed_kmh, 2),  # km/h
-                "max_speed": round(max_speed_kmh, 2),  # km/h
-                "average_pace": speed_to_pace(speed_kmh),  # 분:초.mmm/km
-                "max_pace": speed_to_pace(max_speed_kmh),  # 분:초.mmm/km
-                "average_hr": lap.average_hr,              # bpm
-                "max_hr": lap.max_hr,                      # bpm
-                "average_run_cadence": lap.average_run_cadence  # spm
-            })
-        
-        # 거리: m -> km, 속도: m/s -> km/h, 시간: s -> min
-        speed_kmh = activity.average_speed * 3.6  # m/s -> km/h
-        max_speed_kmh = activity.max_speed * 3.6  # m/s -> km/h
-        response.append({
-            "id": activity.id,
-            "activity_id": activity.activity_id,
-            "activity_name": activity.activity_name,
-            "local_start_time": activity.start_time_local,
-            "distance": round(activity.distance / 1000, 2),  # km
-            "duration": format_duration(activity.duration),  # HH:MM:SS.mmm
-            "average_speed": round(speed_kmh, 2),  # km/h
-            "max_speed": round(max_speed_kmh, 2),  # km/h
-            "average_pace": speed_to_pace(speed_kmh),  # 분:초.mmm/km
-            "max_pace": speed_to_pace(max_speed_kmh),  # 분:초.mmm/km
-            "average_cadence": activity.average_cadence,    # spm
-            "average_hr": activity.average_hr,              # bpm
-            "max_hr": activity.max_hr,                      # bpm
-            "laps": laps_data
-        })
-
-    return response
-    
-@app.get("/activities/summary/user/{user_id}")
-async def get_activity_summary(user_id: int, db: Session = Depends(get_db)):
-    activities = db.query(Activity).filter(Activity.user_id == user_id).all()
-    
-    total_activities = len(activities)
-    total_distance = sum(activity.distance for activity in activities) / 1000  # m -> km
-    total_duration = sum(activity.duration for activity in activities)  # seconds
-    
-    # 평균 페이스 계산
-    if total_distance > 0:
-        avg_speed = (total_distance * 1000) / total_duration  # m/s
-        avg_speed_kmh = avg_speed * 3.6  # km/h
-        avg_pace = speed_to_pace(avg_speed_kmh)  # min/km
-    else:
-        avg_pace = "00:00"
-
-    return {
-        "total_activities": total_activities,
-        "total_distance": round(total_distance, 2),  # km
-        "total_duration": format_duration(total_duration),  # HH:MM:SS
-        "average_pace": avg_pace  # min/km
-    }
-
