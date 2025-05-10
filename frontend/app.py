@@ -111,6 +111,20 @@ def get_activity_summary():
         st.error(f"API 연결 오류: {str(e)}")
     return None
 
+def get_dashboard_data():
+    response = None
+
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/dashboard/user/{st.session_state.user['id']}",
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"API 연결 오류: {str(e)}")
+    return None
+
 def format_duration(duration_str):
     # "HH:MM:SS" 형식의 문자열을 파싱
     try:
@@ -130,21 +144,83 @@ tab1, tab5 = st.tabs(["홈", "활동 기록"])
 # 홈 페이지
 with tab1:
     st.title(f"🏃 {st.session_state.user['username']}님, 환영합니다!")
+
+    dashboard_data = get_dashboard_data()
     
-    # 사용자 정보 표시
-    user_data = get_user_data()
-    if user_data:
-        st.subheader("내 정보")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"이름: {user_data['username']}")
-            st.write(f"이메일: {user_data['email']}")
-            st.write(f"나이: {user_data['age']}세")
-        with col2:
-            st.write(f"체중: {user_data['weight']}kg")
-            st.write(f"키: {user_data['height']}cm")
-            st.write(f"목표 대회: {user_data['target_race']}")
-            st.write(f"목표 시간: {user_data['target_time']}")
+    col1, col2 = st.columns(2)
+    with col1:
+    # 최근 활동 피드백 섹션
+        with st.container():
+            st.markdown("""
+                <style>
+                .recent-activity {
+                    background-color: #f0f2f6;
+                    padding: 10px;
+                    border-radius: 10px;
+                    margin-bottom: 20px;
+                }
+                </style>
+                <div class="recent-activity">
+                    <h4>📊 최근 활동 피드백</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            # TODO: 최근 활동 피드백 내용 추가
+            if dashboard_data:
+                st.write(dashboard_data['latest_feedback'])
+            else:
+                st.write("활동기록 탭에서 활동에 대한 피드백을 요청해주세요")
+    
+    with col2:
+        # 장단점 피드백 섹션
+        with st.container():
+            st.markdown("""
+                <style>
+                .strength-weakness {
+                    background-color: #e6f3ff;
+                    padding: 10px;
+                    border-radius: 10px;
+                    margin-bottom: 20px;
+                }
+                </style>
+                <div class="strength-weakness">
+                    <h4>💪 나의 장단점 피드백</h4>
+                </div>
+            """, unsafe_allow_html=True)
+            # TODO: 장단점 피드백 내용 추가
+            if dashboard_data:
+                st.write(dashboard_data['runner_feedback'])
+            else:
+                st.write("피드백 요청 탭에서 피드백을 요청해주세요")
+    
+    # 내 정보 섹션
+    with st.container():
+        st.markdown("""
+            <style>
+            .user-info {
+                background-color: #f0f7ff;
+                padding: 10px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+            }
+            </style>
+            <div class="user-info">
+                <h4>👤 내 정보</h4>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 사용자 정보 표시
+        user_data = get_user_data()
+        if user_data:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"⠀⠀⠀이름: {user_data['username']}")
+                st.write(f"⠀⠀⠀이메일: {user_data['email']}")
+                st.write(f"⠀⠀⠀나이: {user_data['age']}세")
+            with col2:
+                st.write(f"체중: {user_data['weight']}kg")
+                st.write(f"키: {user_data['height']}cm")
+                st.write(f"목표 대회: {user_data['target_race']}")
+                st.write(f"목표 시간: {user_data['target_time']}")
 
 # 활동 기록 페이지
 with tab5:
@@ -213,7 +289,11 @@ with tab5:
                 
                 # 활동에 대한 댓글 입력
                 st.write("---")
-                st.write("💬 댓글을 남겨보세요")
+                st.write("💬 자신의 활동에 댓글을 남겨보세요(AI에게 핑계를 전달할 수 있어요)")
+                # 기존 댓글들도 랜더링 되도록 해야한다
+                # activity_comments = activity['comments']
+                # for comment in activity_comments:
+                #     st.write(f"💬 {comment['comment']}")
                 user_comment = st.text_area("", placeholder="이 활동에 대한 생각을 공유해보세요...", key=f"comment_{activity['activity_id']}")
                 
                 # 댓글 제출 버튼
