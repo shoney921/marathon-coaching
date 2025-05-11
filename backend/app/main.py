@@ -26,8 +26,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class GarminSyncRequest(BaseModel):
-    email: str
-    password: str
+    garmin_email: str
+    garmin_password: str
 
 # 데이터베이스 설정
 SQLALCHEMY_DATABASE_URL = "sqlite:///./marathon.db?check_same_thread=False"
@@ -114,6 +114,13 @@ async def log_requests(request: Request, call_next):
         media_type=response.media_type
     )
 
+@app.get("/users/{user_id}")
+async def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
 @app.post("/users/")
 async def create_user(user_data: dict, db: Session = Depends(get_db)):
     # 비밀번호 해시화
@@ -126,49 +133,52 @@ async def create_user(user_data: dict, db: Session = Depends(get_db)):
     db.refresh(user)
     return user
 
-@app.get("/users/", response_model=List[dict])
-async def get_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return [{"id": user.id, 
-             "username": user.username, 
-             "email": user.email,
-             "age": user.age,
-             "weight": user.weight,
-             "height": user.height,
-             "target_race": user.target_race,
-             "target_time": user.target_time} for user in users]
-
-@app.get("/users/{user_id}")
-async def get_user(user_id: int, db: Session = Depends(get_db)):
+@app.put("/users/{user_id}")
+async def update_user(user_id: int, user_data: dict, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    for key, value in user_data.items():
+        setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
     return user
 
-@app.post("/training-logs/")
-async def create_training_log(log_data: dict, db: Session = Depends(get_db)):
-    # 문자열 날짜를 datetime 객체로 변환
-    if isinstance(log_data.get('date'), str):
-        log_data['date'] = datetime.fromisoformat(log_data['date'])
+@app.post("/users/garmin/{user_id}")
+async def update_garmin_sync(user_id: int, garmin_data: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     
-    log = TrainingLog(**log_data)
-    db.add(log)
+    # 가민 연동 해제인 경우
+    if garmin_data.get("garmin_sync_status") == "disconnected":
+        user.garmin_email = None
+        user.garmin_password = None
+        user.garmin_sync_status = "disconnected"
+        user.garmin_sync_date = None
+        db.commit()
+        db.refresh(user)
+        return {
+            "garmin_sync_status": "disconnected",
+            "message": "Garmin sync disconnected successfully"
+        }
+    
+    # 가민 연동인 경우
+    garmin_service = GarminService(db)
+    if not garmin_service.check_garmin_login(garmin_data["garmin_email"], garmin_data["garmin_password"]):
+        raise HTTPException(status_code=400, detail="Garmin login failed")
+    
+    user.garmin_email = garmin_data["garmin_email"]
+    user.garmin_password = garmin_data["garmin_password"]
+    user.garmin_sync_date = datetime.now()
+    user.garmin_sync_status = "success"
+    
     db.commit()
-    db.refresh(log)
-    return log
-
-@app.get("/training-logs/user/{user_id}")
-async def get_training_logs(user_id: int, db: Session = Depends(get_db)):
-    logs = db.query(TrainingLog).filter(TrainingLog.user_id == user_id).all()
-    return logs
-
-@app.post("/sleep-logs/")
-async def create_sleep_log(log_data: dict, db: Session = Depends(get_db)):
-    log = SleepLog(**log_data)
-    db.add(log)
-    db.commit()
-    db.refresh(log)
-    return log
+    db.refresh(user)
+    return {
+        "garmin_sync_date": user.garmin_sync_date,
+        "garmin_sync_status": user.garmin_sync_status
+    }
 
 @app.post("/auth/login/")
 async def login(user_data: dict, db: Session = Depends(get_db)):
@@ -213,6 +223,11 @@ async def get_activity_summary(user_id: int, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)
     return activity_service.get_activity_summary(user_id)
 
+@app.post("/activities/user/{user_id}") 
+async def create_activity(user_id: int, activity_data: dict, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.create_activity(user_id, activity_data)
+
 @app.post("/activities/comments/")
 async def create_activity_comment(comment_data: dict, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)
@@ -226,7 +241,7 @@ def delete_activity_comment(comment_id: int, db: Session = Depends(get_db)):
 @app.post("/sync-garmin-activities/{user_id}")
 async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db: Session = Depends(get_db)):
     garmin_service = GarminService(db)
-    return garmin_service.sync_activities(user_id, user_data.email, user_data.password)
+    return garmin_service.sync_activities(user_id, user_data.garmin_email, user_data.garmin_password)
 
 
 ## 유틸 함수

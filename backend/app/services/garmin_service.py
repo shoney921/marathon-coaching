@@ -24,7 +24,21 @@ class GarminService:
         """
         self.db = db
 
-    def sync_activities(self, user_id: int, email: str, password: str):
+    def check_garmin_login(self, email: str, password: str):
+        """
+        Garmin Connect 로그인 여부를 확인합니다.
+        
+        Args:
+            email (str): Garmin Connect 이메일  
+            password (str): Garmin Connect 비밀번호
+            
+        Returns:
+            bool: 로그인 여부
+        """
+        client = Garmin(email, password)
+        return client.login()
+
+    def sync_activities(self, user_id: int, garmin_email: str, garmin_password: str):
         """
         Garmin Connect에서 사용자의 활동 데이터를 동기화합니다.
         
@@ -45,7 +59,7 @@ class GarminService:
             logger.info("Starting Garmin sync process")
             
             # Garmin Connect 클라이언트 초기화
-            client = Garmin(email, password)
+            client = Garmin(garmin_email, garmin_password)
             
             # 로그인
             logger.info("Attempting to login to Garmin Connect")

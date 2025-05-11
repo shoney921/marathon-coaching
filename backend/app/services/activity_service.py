@@ -172,6 +172,22 @@ class ActivityService:
             "favorite": activity.favorite,
             "manual_activity": activity.manual_activity
         }
+    
+    def create_activity(self, user_id: int, activity_data: dict):
+        """
+        새로운 활동을 생성합니다.
+        
+        Args:
+            activity_data (dict): 활동 데이터
+            
+        Returns:
+            dict: 생성된 활동 정보
+        """
+        activity = Activity(**activity_data)
+        activity.user_id = user_id
+        self.db.add(activity)
+        self.db.commit()
+        return activity
 
     def get_activities_laps_with_comments(self, user_id: int):
         """

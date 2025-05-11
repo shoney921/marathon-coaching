@@ -17,6 +17,10 @@ class User(Base):
     height = Column(Float)
     target_race = Column(String)
     target_time = Column(String)
+    garmin_email = Column(String)
+    garmin_password = Column(String)
+    garmin_sync_date = Column(DateTime)
+    garmin_sync_status = Column(String)
     
     training_logs = relationship("TrainingLog", back_populates="user")
     sleep_logs = relationship("SleepLog", back_populates="user")
