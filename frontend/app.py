@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 import os
 from components.activity_calendar import create_activity_calendar
+from streamlit_calendar import calendar
 
 # API 엔드포인트 설정
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
@@ -148,7 +149,7 @@ def format_duration(duration_str):
         return duration_str
 
 # 탭 생성
-tab1, tab5 = st.tabs(["홈", "활동 기록"])
+tab1, tab5, tab6 = st.tabs(["홈", "활동 기록", "일정 관리"])
 
 # 홈 페이지
 with tab1:
@@ -476,4 +477,155 @@ with tab5:
             st.rerun()
         else:
             st.error("가민에서 활동 기록 가져오기 실패")
+    
+
+# 일정 관리 페이지
+with tab6:
+    st.title("📅 일정 관리")
+    
+    # 일정 추가 폼
+    with st.expander("➕ 새로운 일정 추가하기"):
+        with st.form(key="schedule_form"):
+            event_title = st.text_input("일정 제목")
+            event_date = st.date_input("날짜")
+            event_time = st.time_input("시간")
+            event_description = st.text_area("설명")
+            event_type = st.selectbox("일정 유형", ["훈련", "대회", "휴식", "기타"])
+            
+            # 일정 유형에 따른 색상 매핑
+            color_mapping = {
+                "훈련": "#4CAF50",  # 초록색
+                "대회": "#FF5722",  # 주황색
+                "휴식": "#2196F3",  # 파란색
+                "기타": "#9C27B0"   # 보라색
+            }
+            
+            submit_button = st.form_submit_button("일정 추가")
+            
+            if submit_button:
+                if not event_title:
+                    st.error("일정 제목을 입력해주세요.")
+                else:
+                    try:
+                        event_datetime = datetime.combine(event_date, event_time)
+                        event_data = {
+                            "title": event_title,
+                            "datetime": event_datetime.isoformat(),
+                            "description": event_description,
+                            "type": event_type,
+                            "user_id": st.session_state.user['id']
+                        }
+                        
+                        # 임시로 성공 메시지만 표시
+                        st.success("일정이 성공적으로 추가되었습니다.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"일정 추가 중 오류가 발생했습니다: {str(e)}")
+    
+    # 달력 뷰와 리스트 뷰를 탭으로 구분
+    calendar_tab, list_tab = st.tabs(["📅 달력 보기", "📋 목록 보기"])
+    
+    # 임시 하드코딩된 일정 데이터
+    mock_schedules = [
+        {
+            "id": 1,
+            "title": "기초 체력 훈련",
+            "datetime": datetime.now().replace(hour=9, minute=0).isoformat(),
+            "description": "30분 러닝 + 스트레칭",
+            "type": "훈련"
+        },
+        {
+            "id": 2,
+            "title": "서울 마라톤",
+            "datetime": (datetime.now() + timedelta(days=7)).replace(hour=8, minute=0).isoformat(),
+            "description": "2024 서울 마라톤 대회",
+            "type": "대회"
+        },
+        {
+            "id": 3,
+            "title": "휴식일",
+            "datetime": (datetime.now() + timedelta(days=2)).replace(hour=0, minute=0).isoformat(),
+            "description": "완전 휴식",
+            "type": "휴식"
+        },
+        {
+            "id": 4,
+            "title": "영양사 상담",
+            "datetime": (datetime.now() + timedelta(days=3)).replace(hour=14, minute=30).isoformat(),
+            "description": "마라톤 대비 영양 상담",
+            "type": "기타"
+        },
+        {
+            "id": 5,
+            "title": "인터벌 훈련",
+            "datetime": (datetime.now() + timedelta(days=1)).replace(hour=18, minute=0).isoformat(),
+            "description": "400m x 10세트 인터벌 훈련",
+            "type": "훈련"
+        }
+    ]
+    
+    # 달력 뷰
+    with calendar_tab:
+        # 일정 데이터를 달력 형식으로 변환
+        calendar_events = []
+        for schedule in mock_schedules:
+            event_datetime = datetime.fromisoformat(schedule['datetime'])
+            calendar_events.append({
+                "title": schedule['title'],
+                "start": event_datetime.strftime("%Y-%m-%dT%H:%M:%S"),
+                "end": (event_datetime + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "backgroundColor": color_mapping.get(schedule['type'], "#9C27B0"),
+                "borderColor": color_mapping.get(schedule['type'], "#9C27B0"),
+                "textColor": "#ffffff",
+                "description": schedule['description'],
+                "id": str(schedule['id'])
+            })
+        
+        # 달력 표시
+        calendar_options = {
+            "headerToolbar": {
+                "left": "prev,next today",
+                "center": "title",
+                "right": "dayGridMonth,timeGridWeek,timeGridDay"
+            },
+            "initialView": "dayGridMonth",
+            "locale": "ko",
+            "height": "600px",
+            "editable": True,
+            "selectable": True,
+            "selectMirror": True,
+            "dayMaxEvents": True,
+            "weekends": True,
+            "nowIndicator": True,
+            "allDaySlot": True,
+            "slotMinTime": "00:00:00",
+            "slotMaxTime": "24:00:00"
+        }
+        
+        calendar_result = calendar(
+            events=calendar_events,
+            options=calendar_options,
+            key="calendar"
+        )
+        
+        # 달력 이벤트 처리
+        if calendar_result:
+            st.write("선택된 일정:", calendar_result)
+    
+    # 리스트 뷰
+    with list_tab:
+        st.subheader("일정 목록")
+        for schedule in mock_schedules:
+            event_datetime = datetime.fromisoformat(schedule['datetime'])
+            formatted_datetime = event_datetime.strftime('%Y년 %m월 %d일 - %H시 %M분')
+            
+            with st.expander(f"[{formatted_datetime}] {schedule['title']}"):
+                st.write(f"**일정 유형:** {schedule['type']}")
+                st.write(f"**설명:** {schedule['description']}")
+                
+                # 일정 삭제 버튼
+                if st.button("🗑️ 삭제", key=f"delete_schedule_{schedule['id']}"):
+                    st.success("일정이 삭제되었습니다.")
+                    st.rerun()
+
     
