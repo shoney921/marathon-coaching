@@ -52,7 +52,8 @@ def create_activity_calendar(activities):
             transform: translate(-50%, -50%);
             font-size: 10px;
             color: #666;
-            opacity: 0.7;
+            font-weight: bold;
+            z-index: 1;
         }
         .month-label {
             position: absolute;
@@ -76,29 +77,43 @@ def create_activity_calendar(activities):
     
     # 현재 날짜 기준으로 최근 365일의 캘린더 생성
     today = datetime.now().date()
-    calendar_html = '<div class="calendar-wrapper">'
     
-    # 캘린더 그리드 시작
+    # 시작 날짜 계산 (365일 전)
+    start_date = today - timedelta(days=364)  # 364일 전부터 시작 (365일 포함)
+    
+    # 시작 날짜의 요일을 기준으로 시작 날짜 조정 (일요일이 첫 번째 열에 오도록)
+    days_to_subtract = start_date.weekday() + 1  # 0(월요일)부터 6(일요일)까지
+    start_date = start_date - timedelta(days=days_to_subtract)
+    
+    calendar_html = '<div class="calendar-wrapper">'
     calendar_html += '<div class="calendar-body">'
     calendar_html += '<div class="calendar-container">'
     
-    # 시작 날짜 계산 (365일 전)
-    start_date = today - timedelta(days=365)
-    
-    # 현재 날짜까지의 주 수 계산
-    total_weeks = (today - start_date).days // 7 + 1
-    
     # 요일 레이블을 포함한 주 단위로 캘린더 생성
     weekdays = ['일', '월', '화', '수', '목', '금', '토']
+    
+    # 총 주 수 계산 (시작 날짜부터 오늘까지)
+    total_weeks = (today - start_date).days // 7 + 1
     
     for week in range(total_weeks):
         week_html = '<div class="week-column">'
         for day in range(7):
             date = start_date + timedelta(days=week * 7 + day)
             
+            # 365일 이전의 날짜는 표시하지 않음
+            if date < (today - timedelta(days=364)):
+                week_html += '<div class="calendar-day" style="background-color: transparent;">'
+                if week == 0:
+                    week_html += f'<span class="weekday-label">{weekdays[day]}</span>'
+                week_html += '</div>'
+                continue
+            
             # 현재 날짜를 넘어가면 빈 칸으로 표시
             if date > today:
-                week_html += '<div class="calendar-day" style="background-color: transparent;"></div>'
+                week_html += '<div class="calendar-day" style="background-color: transparent;">'
+                if week == 0:
+                    week_html += f'<span class="weekday-label">{weekdays[day]}</span>'
+                week_html += '</div>'
                 continue
             
             # 첫 번째 컬럼에만 요일 레이블 추가
@@ -125,10 +140,7 @@ def create_activity_calendar(activities):
                     level = 0
                     
                 tooltip = f"{date.strftime('%Y-%m-%d')}<br>총 거리: {total_distance:.1f}km"
-                day_html = f'<div class="calendar-day activity-level-{level}" title="{tooltip}"'
-                if weekday_label:
-                    day_html += ' style="background-color: transparent;"'
-                day_html += '>'
+                day_html = f'<div class="calendar-day activity-level-{level}" title="{tooltip}">'
                 if weekday_label:
                     day_html += f'<span class="weekday-label">{weekday_label}</span>'
                 if month_label:
@@ -136,12 +148,7 @@ def create_activity_calendar(activities):
                 day_html += '</div>'
                 week_html += day_html
             else:
-                day_html = f'<div class="calendar-day activity-level-0'
-                if weekday_label:
-                    day_html += '" style="background-color: transparent;"'
-                else:
-                    day_html += '"'
-                day_html += '>'
+                day_html = f'<div class="calendar-day activity-level-0">'
                 if weekday_label:
                     day_html += f'<span class="weekday-label">{weekday_label}</span>'
                 if month_label:
