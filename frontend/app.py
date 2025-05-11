@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+from components.activity_calendar import create_activity_calendar
 
 # API 엔드포인트 설정
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
@@ -17,6 +18,8 @@ st.set_page_config(
 # 세션 상태 초기화
 if 'user' not in st.session_state:
     st.session_state.user = None
+if 'token' not in st.session_state:
+    st.session_state.token = None
 
 # 로그인 체크
 if not st.session_state.user:
@@ -25,17 +28,23 @@ if not st.session_state.user:
 # 사이드바 설정
 with st.sidebar:
     st.title("👤 사용자 정보")
-    st.write(f"이름: {st.session_state.user['username']}")
-    st.write(f"이메일: {st.session_state.user['email']}")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("회원 계정 관리"):
-            st.switch_page("pages/account.py")
-    with col2:
-        if st.button("로그아웃"):
-            st.session_state.user = None
-            st.rerun()
+    if st.session_state.user:
+        st.write(f"이름: {st.session_state.user['username']}")
+        st.write(f"이메일: {st.session_state.user['email']}")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("회원 계정 관리"):
+                st.switch_page("pages/account.py")
+        with col2:
+            if st.button("로그아웃"):
+                st.session_state.user = None
+                st.session_state.token = None
+                st.rerun()
+    else:
+        st.warning("로그인이 필요합니다.")
+        if st.button("로그인"):
+            st.switch_page("pages/login.py")
             
 # 공통 함수
 def get_user_data():
@@ -192,6 +201,19 @@ with tab1:
             else:
                 st.write("피드백 요청 탭에서 피드백을 요청해주세요")
     
+
+    st.write("---")
+
+    # 활동 캘린더 추가
+    st.write("#### 활동 캘린더")
+    activities = get_activities_laps()
+    if activities:
+        create_activity_calendar(activities)
+    else:
+        st.info("활동 기록이 없습니다.")
+
+    st.write("---")
+
     # 내 정보 섹션
     with st.container():
         st.markdown("""
@@ -224,10 +246,12 @@ with tab1:
 
 # 활동 기록 페이지
 with tab5:
+    activities = get_activities_laps()
+    activity_summary = get_activity_summary()
+
     st.title("🏃 활동 기록")
 
     # 활동 누적 요약 표시
-    activity_summary = get_activity_summary()
     if activity_summary:
         st.subheader(f"Total {activity_summary['total_distance']} km")
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -246,8 +270,72 @@ with tab5:
 
     st.write("---")
     st.write("#### 활동 기록 목록")
-    # 활동 기록 목록 표시
-    activities = get_activities_laps()
+
+
+    # 수동 활동 등록 섹션
+    with st.expander("➕ 새로운 활동 수동 등록하기"):
+        st.subheader("활동 정보 입력")
+        with st.form(key="activity_form"):
+            activity_name = st.text_input("활동명", key="activity_name")
+            col1, col2 = st.columns(2)
+            with col1:
+                distance = st.number_input("거리 (km)", min_value=0.1, step=0.1, key="distance")
+                duration = st.text_input("소요 시간 (예: 01:30:00)", key="duration", help="HH:MM:SS 형식으로 입력해주세요")
+                average_pace = st.text_input("평균 페이스 (예: 05:30)", key="average_pace", help="MM:SS 형식으로 입력해주세요")
+            with col2:
+                average_hr = st.number_input("평균 심박수 (bpm)", min_value=0, key="average_hr")
+                max_hr = st.number_input("최대 심박수 (bpm)", min_value=0, key="max_hr")
+                average_cadence = st.number_input("평균 케이던스 (spm)", min_value=0, key="average_cadence")
+            
+            submit_button = st.form_submit_button("활동 등록")
+            
+            if submit_button:
+                if not all([activity_name, distance, duration, average_pace]):
+                    st.error("필수 정보를 모두 입력해주세요.")
+                else:
+                    try:
+                        # 시간 형식 검증
+                        try:
+                            hours, minutes, seconds = map(int, duration.split(':'))
+                            duration_seconds = hours * 3600 + minutes * 60 + seconds
+                        except:
+                            st.error("소요 시간은 HH:MM:SS 형식으로 입력해주세요.")
+                            st.stop()
+                            
+                        # 페이스 형식 검증
+                        try:
+                            pace_minutes, pace_seconds = map(int, average_pace.split(':'))
+                            pace_seconds_total = pace_minutes * 60 + pace_seconds
+                        except:
+                            st.error("평균 페이스는 MM:SS 형식으로 입력해주세요.")
+                            st.stop()
+                        
+                        activity_data = {
+                            "activity_name": activity_name,
+                            "distance": distance,
+                            "duration": duration_seconds,
+                            "average_pace": average_pace,
+                            "average_hr": average_hr,
+                            "max_hr": max_hr,
+                            "average_cadence": average_cadence,
+                            "start_time_local": datetime.now().isoformat(),
+                            "activity_type": "running"
+                        }
+                        
+                        response = requests.post(
+                            f"{API_BASE_URL}/activities/user/{st.session_state.user['id']}",
+                            headers={"Authorization": f"Bearer {st.session_state.token}"},
+                            json=activity_data
+                        )
+                        
+                        if response.status_code == 200:
+                            st.success("활동이 성공적으로 등록되었습니다.")
+                            st.rerun()
+                        else:
+                            st.error("활동 등록에 실패했습니다.")
+                    except Exception as e:
+                        st.error(f"활동 등록 중 오류가 발생했습니다: {str(e)}")
+
     if activities:
         for activity in activities:
             # 날짜 형식 변환
@@ -371,3 +459,21 @@ with tab5:
                     #     st.error("피드백 요청에 실패했습니다.")
     else:
         st.info("등록된 활동 기록이 없습니다.") 
+
+    # 가민에서 활동 기록 가져오기 버튼
+    if st.button("가민에서 활동 기록 가져오기"):
+        print("가민에서 활동 기록 가져오기")
+        # TODO: 가민에서 활동 기록 가져오기 API 호출
+        garmin_email = st.session_state.garmin_email    
+        garmin_password = st.session_state.garmin_password
+        response = requests.post(
+            f"{API_BASE_URL}/sync-garmin-activities/{st.session_state.user['id']}",
+            headers={"Authorization": f"Bearer {st.session_state.token}"},
+            json={"garmin_email": garmin_email, "garmin_password": garmin_password}
+        )
+        if response.status_code == 200:
+            st.success("가민에서 활동 기록 가져오기 완료")
+            st.rerun()
+        else:
+            st.error("가민에서 활동 기록 가져오기 실패")
+    

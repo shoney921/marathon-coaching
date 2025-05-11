@@ -45,6 +45,20 @@ def update_user_data(user_data):
         st.error(f"API 연결 오류: {str(e)}")
     return False
 
+def update_garmin_sync(user_data):
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/users/garmin/{st.session_state.user['id']}",
+            headers={"Authorization": f"Bearer {st.session_state.token}"},
+            json=user_data
+        )   
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"API 연결 오류: {str(e)}")
+        return None
+
 # 현재 사용자 정보 가져오기
 user_data = get_user_data()
 
@@ -104,3 +118,47 @@ if user_data:
                 st.rerun()
             else:
                 st.error("회원 정보 수정에 실패했습니다.") 
+
+    st.subheader("가민 연동 정보 수정")
+    with st.form(key="edit_garmin_sync_form"):
+        if user_data['garmin_sync_status'] == "success":
+            garmin_email = user_data['garmin_email']
+            st.success("가민 연동 정보가 이미 성공적으로 연동되었습니다.")
+            st.write(f"가민 이메일: {garmin_email}")
+            disconnect_button = st.form_submit_button(label="가민 연동 해제")
+            
+            if disconnect_button:
+                update_data = {
+                    "garmin_sync_status": "disconnected"
+                }
+                response = update_garmin_sync(update_data)
+                if response and response.get("garmin_sync_status") == "disconnected":
+                    st.success("가민 연동 정보가 성공적으로 해제되었습니다.")
+                    st.rerun()
+                else:
+                    st.error("가민 연동 해제에 실패했습니다.")
+        else:
+            garmin_email = st.text_input("가민 이메일", value=user_data['garmin_email'])
+            garmin_password = st.text_input("가민 비밀번호", type="password")
+            connect_button = st.form_submit_button(label="가민 연동 정보 수정")
+
+            if connect_button:
+                if garmin_email and garmin_password:
+                    update_data = {
+                        "garmin_email": garmin_email,
+                        "garmin_password": garmin_password
+                    }
+
+                    try:
+                        # 가민 연동 정보 수정
+                        response = update_garmin_sync(update_data)
+                        if response and response.get("garmin_sync_status") == "success":
+                            st.success("가민 연동 정보가 성공적으로 수정되었습니다.")
+                            st.rerun()
+                        else:
+                            error_message = response.get("detail", "가민 연동 정보 수정에 실패했습니다.")
+                            st.error(f"가민 연동 정보 수정에 실패했습니다: {error_message}")
+                    except Exception as e:
+                        st.error(f"가민 연동 정보 수정 중 오류가 발생했습니다: {str(e)}")
+                else:
+                    st.error("가민 이메일과 비밀번호를 모두 입력해주세요.")

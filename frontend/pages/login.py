@@ -24,6 +24,8 @@ def login_user(email, password):
             response_data = response.json()
             st.session_state.user = response_data['user']   
             st.session_state.token = response_data['token']
+            st.session_state.garmin_email = response_data['user']['garmin_email']
+            st.session_state.garmin_password = response_data['user']['garmin_password']
             st.success("로그인 성공!")
             st.rerun()
             return response_data['user']
