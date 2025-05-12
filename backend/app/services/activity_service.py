@@ -293,6 +293,47 @@ class ActivityService:
             "total_duration": self._format_duration(total_duration),
             "average_pace": avg_pace
         }
+    
+    def get_monthly_activity_summary(self, user_id: int):
+        """
+        사용자의 월별 활동 통계 정보를 조회합니다.
+        
+        Args:
+            user_id (int): 사용자 ID
+            
+        Returns:
+            dict: 월별 활동 통계 정보
+                - month: 월
+                - total_distance: 총 거리 (km)
+                - total_duration: 총 소요 시간
+                - average_pace: 평균 페이스
+        """
+        activities = self.db.query(Activity).filter(
+            Activity.user_id == user_id
+        ).all()
+        
+        monthly_summary = {}
+        for activity in activities:
+            month = activity.start_time_local.strftime('%Y-%m')
+            if month not in monthly_summary:
+                monthly_summary[month] = {
+                    "total_distance": 0,
+                    "total_duration": 0,
+                    "average_pace": "00:00"
+                }
+            monthly_summary[month]["total_distance"] += activity.distance / 1000  # m -> km
+            monthly_summary[month]["total_duration"] += activity.duration
+        
+        for month, data in monthly_summary.items():
+            if data["total_duration"] > 0:
+                avg_speed = (data["total_distance"] * 1000) / data["total_duration"]  # m/s
+                avg_speed_kmh = avg_speed * 3.6  # km/h
+                data["average_pace"] = self._speed_to_pace(avg_speed_kmh)
+
+            data["total_duration"] = self._format_duration(data["total_duration"])
+        
+        return monthly_summary
+                
 
     def create_activity_comment(self, comment_data: dict):
         """

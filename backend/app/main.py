@@ -223,6 +223,11 @@ async def get_activity_summary(user_id: int, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)
     return activity_service.get_activity_summary(user_id)
 
+@app.get("/activities/monthly-summary/user/{user_id}")
+async def get_monthly_activity_summary(user_id: int, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.get_monthly_activity_summary(user_id)
+
 @app.post("/activities/user/{user_id}") 
 async def create_activity(user_id: int, activity_data: dict, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)

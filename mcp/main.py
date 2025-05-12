@@ -92,55 +92,34 @@ class BackendClient:
                 import traceback
                 logger.warning(f"스택 트레이스: {traceback.format_exc()}")
 
-            logger.info("테스트 데이터를 반환합니다.")
-            # API 호출 실패 시 테스트 데이터 반환
-            return [
-                {
-                    "id": 1,
-                    "activity_id": "run_001",
-                    "user_id": user_id,
-                    "activity_name": "아침 러닝",
-                    "start_time_local": "2024-03-20T06:30:00",
-                    "distance": 5.2,
-                    "duration": 1800,
-                    "pace": 5.45,
-                    "heart_rate": 145,
-                    "calories": 320,
-                    "notes": "날씨가 좋아서 페이스가 잘 나왔음",
-                    "location": "서울숲공원",
-                    "weather": {"temperature": 15, "condition": "맑음"},
-                    "splits": [
-                        {"km": 1, "pace": 5.30, "heart_rate": 140},
-                        {"km": 2, "pace": 5.40, "heart_rate": 145},
-                        {"km": 3, "pace": 5.50, "heart_rate": 150},
-                        {"km": 4, "pace": 5.45, "heart_rate": 148},
-                        {"km": 5, "pace": 5.40, "heart_rate": 145}
-                    ]
-                }
-            ]
         except Exception as e:
             logger.error(f"Failed to fetch running activities: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to fetch running activities")
 
-    async def get_activity_stats(self, user_id: int):
+    async def get_monthly_activity_summary(self, user_id: int):
         try:
-            return {
-                "total_distance": 35.7,
-                "total_duration": 12300,
-                "average_pace": 5.75,
-                "total_calories": 2150,
-                "weekly_stats": {
-                    "distance": 35.7,
-                    "duration": 12300,
-                    "activities": 4,
-                    "average_heart_rate": 153,
-                    "pace_distribution": {
-                        "easy": 1,
-                        "moderate": 2,
-                        "hard": 1
-                    }
-                }
-            }
+            url = f"{self.base_url}/activities/monthly-summary/user/{user_id}"
+            try:
+                logger.info(f"백엔드 API 호출 시도: {url}")
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            logger.info(f"API 호출 성공: {url}")
+                            return data
+                        else:
+                            error_text = await response.text()
+                            logger.warning(f"API 호출 실패 (상태 코드: {response.status})")
+                            logger.warning(f"에러 응답: {error_text}")
+                            logger.warning(f"요청 URL: {url}")
+                            logger.warning(f"요청 헤더: {response.request_info.headers}")
+            except aiohttp.ClientError as e:
+                logger.warning(f"API 연결 실패 (ClientError): {str(e)}")
+                logger.warning(f"요청 URL: {url}")
+                logger.warning(f"에러 타입: {type(e).__name__}")
+                import traceback
+                logger.warning(f"스택 트레이스: {traceback.format_exc()}")
+
         except Exception as e:
             logger.error(f"Failed to fetch activity stats: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to fetch activity stats")
@@ -173,28 +152,28 @@ class RunningActivityAgent:
                     logger.error(f"Error in get_activities_wrapper: {str(e)}")
                     return "[]"
             
-            def get_stats_wrapper(_):
+            def get_monthly_activity_summary_wrapper(_):
                 try:
                     client = BackendClient()
                     import asyncio
-                    result = asyncio.run(client.get_activity_stats(self.user_id))
+                    result = asyncio.run(client.get_monthly_activity_summary(self.user_id))
                     # Python 객체를 JSON 문자열로 변환
                     import json
                     return json.dumps(result, ensure_ascii=False)
                 except Exception as e:
-                    logger.error(f"Error in get_stats_wrapper: {str(e)}")
+                    logger.error(f"Error in get_monthly_activity_summary_wrapper: {str(e)}")
                     return "{}"
             
             self.tools = [
                 Tool(
                     name="GetRunningActivities",
                     func=get_activities_wrapper,
-                    description="최근 한달간 러닝 활동 데이터를 조회합니다."
+                    description="모든 러닝 활동 데이터를 조회합니다. 러닝 활동 데이터는 러닝 활동 이름, 시작 시간, 거리, 소요시간, 페이스, 심박수, 칼로리, 위치, 날씨, 노트 등의 정보를 포함합니다."
                 ),
                 Tool(
-                    name="GetActivityStats",
-                    func=get_stats_wrapper,
-                    description="월간 러닝 활동 통계를 조회합니다."
+                    name="GetMonthlyActivitySummary",
+                    func=get_monthly_activity_summary_wrapper,
+                    description="러닝 활동 월간 통계를 조회합니다. 월별 거리, 소요시간, 평균 페이스를 조회합니다."
                 )
             ]
             
@@ -243,7 +222,7 @@ class RunningActivityAgent:
             6. Action은 반드시 제공된 도구 중 하나만 사용하세요.
             7. Thought 다음에는 반드시 Action이 와야 합니다.
             8. Observation 다음에는 반드시 Thought가 와야 합니다.
-            9. GetRunningActivities와 GetActivityStats 도구는 각각 한 번만 사용하세요.
+            9. GetRunningActivities와 GetMonthlyActivitySummary 도구는 각각 한 번만 사용하세요.
             10. 두 도구의 결과를 모두 수집했다면, 바로 Final Answer를 작성하세요.
             11. Final Answer는 다음 형식으로 작성하세요:
                 - 현재 상태 분석
@@ -271,34 +250,6 @@ class RunningActivityAgent:
                - 단계별 훈련 계획
                - 페이스 조절 방법
                - 휴식 및 회복 전략
-
-            예시 응답 형식:
-            Thought: 사용자의 러닝 활동 데이터를 먼저 확인해야겠습니다.
-
-            Action: GetRunningActivities
-
-            Action Input: {{}}
-
-            Observation: [{{"id":1,"activity_id":"run_001","distance":5.2,"pace":5.45,"heart_rate":145,"calories":320}}]
-
-            Thought: 러닝 활동 데이터를 확인했으니, 이제 통계 데이터도 확인해보겠습니다.
-
-            Action: GetActivityStats
-
-            Action Input: {{}}
-
-            Observation: {{"total_distance":27.7,"total_duration":9900,"average_pace":5.95,"total_calories":1670}}
-
-            Thought: 이제 모든 데이터를 수집했으니 분석을 시작하겠습니다.
-
-            Final Answer: 현재 러닝 상태를 분석한 결과, 다음과 같은 조언을 드립니다:
-            1. 현재 상태: 평균 페이스 5.95분/km로 안정적인 러닝이 가능한 상태입니다.
-            2. 목표 달성 전략: 하프마라톤을 위해 주 3회 러닝을 권장합니다.
-            3. 훈련 계획: 
-               - 주 2회 5km 러닝
-               - 주 1회 10km 러닝
-               - 점진적으로 거리 증가
-            4. 주의사항: 심박수 145bpm을 유지하며 훈련하세요.
             """
         )
         
