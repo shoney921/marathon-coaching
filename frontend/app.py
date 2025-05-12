@@ -492,6 +492,26 @@ with tab5:
 # 일정 관리 페이지
 with tab6:
     st.title("📅 일정 관리")
+
+    if st.button("훈련 일정 생성"):
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/activities/race-training/{st.session_state.user['id']}",
+                headers={"Authorization": f"Bearer {st.session_state.token}"},
+                json={"race_name": "서울 마라톤", "race_date": "2024-10-12", "race_type": "마라톤", "race_time": "04:00:00"}
+            )
+            
+            if response.status_code == 200:
+                schedule_data = response.json()
+                st.success("훈련 일정 생성 완료")
+                st.json(schedule_data)  # JSON 형식으로 보기 좋게 표시
+            else:
+                error_detail = response.json().get('detail', '알 수 없는 오류가 발생했습니다.')
+                st.error(f"훈련 일정 생성 실패: {error_detail}")
+        except requests.exceptions.RequestException as e:
+            st.error(f"서버 연결 오류: {str(e)}")
+        except ValueError as e:
+            st.error(f"응답 처리 오류: {str(e)}")
     
     # 일정 추가 폼
     with st.expander("➕ 새로운 일정 추가하기"):

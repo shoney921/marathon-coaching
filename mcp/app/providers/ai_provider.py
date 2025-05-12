@@ -97,10 +97,20 @@ class AIProvider:
         
         # 비동기 함수를 동기 함수로 래핑
         def sync_get_activities(_):
-            return asyncio.run(get_activities_wrapper(_))
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            return loop.run_until_complete(get_activities_wrapper(_))
             
         def sync_get_monthly_summary(_):
-            return asyncio.run(get_monthly_summary_wrapper(_))
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            return loop.run_until_complete(get_monthly_summary_wrapper(_))
         
         return [
             Tool(
@@ -205,6 +215,120 @@ class AIProvider:
             tools=tools,
             prompt=prompt
         )
+    
+    async def create_race_training(
+        self,
+        user_id: int,
+        race_name: str,
+        race_date: str,
+        race_type: str,
+        race_time: str
+    ) -> Dict[str, Any]:
+        """대회 훈련 일정 생성"""
+        try:
+            # 에이전트 생성 및 실행
+            tools = await self._create_tools(user_id)
+            agent = self._create_race_training_agent(tools)
+            executor = self._create_executor(agent, tools)
+            
+            response = await executor.ainvoke({
+                "today": datetime.now().strftime("%Y-%m-%d"),
+                "race_name": race_name,
+                "race_date": race_date,
+                "race_type": race_type,
+                "race_time": race_time
+            })
+            
+            return {
+                "training_schedule": response.get("output", ""),
+                "metadata": {
+                    "model": self.model_name,
+                    "user_id": user_id
+                }
+            }
+        except Exception as e:
+            logger.error(f"훈련 일정 생성 실패: {str(e)}")
+            raise
+
+    #대회 날짜를 보고 훈련 일정을 짜주는 에이전트
+    def _create_race_training_agent(self, tools: list[Tool]):
+        """에이전트 생성"""
+        prompt = PromptTemplate.from_template(
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '대회 일정'일 까지 맞는 훈련 일정을 제공해준다.
+            오늘 날짜는 {today}입니다. 대회명은 {race_name}입니다. 대회 날짜는 {race_date}입니다.
+            {race_type} 대회의 목표 시간은 {race_time}입니다.
+            조회한 데이터들의 심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 훈련 일정을 작성해주세요.
+            
+            사용 가능한 도구들: {tool_names}
+
+            사용 가능한 도구들의 설명:
+            {tools}
+            
+            {agent_scratchpad}
+            
+            1. 훈련 일정 작성 시 다음 사항을 고려하세요:
+               - 현재 러닝 능력과 대회까지 남은 기간
+               - 주간 훈련 거리와 강도의 점진적 증가
+               - 적절한 휴식과 회복 시간 배분
+               - 장거리 달리기와 단거리 인터벌의 균형
+               - 대회 테이퍼링 기간 설정
+               - 코어/근력 훈련 일정 포함
+               - 부상 예방을 위한 스트레칭과 회복 운동
+            
+            2. 일정은 다음 JSON 형식으로 작성하세요:
+            {{
+                "training_schedule": {{
+                    "start_date": "YYYY-MM-DD",
+                    "race_date": "YYYY-MM-DD",
+                    "race_name": "대회명",
+                    "target_pace": "MM:SS/km",
+                    "weekly_plans": [
+                        {{
+                            "week": 1,
+                            "total_distance": "주간 목표 거리(km)",
+                            "main_focus": "이번 주 중점 사항",
+                            "daily_schedule": [
+                                {{
+                                    "date": "YYYY-MM-DD",
+                                    "distance": "거리(km)",
+                                    "target_pace": "목표 페이스(MM:SS/km)",
+                                    "details": "상세 훈련 내용",
+                                    "additional_training": ["스트레칭", "코어운동" 등]
+                                }}
+                            ],
+                            "key_points": [
+                                "주요 훈련 포인트1",
+                                "주요 훈련 포인트2"
+                            ]
+                        }}
+                    ],
+                    "key_points": [
+                        "주요 훈련 포인트1",
+                        "주요 훈련 포인트2"
+                    ],
+                    "precautions": [
+                        "주의사항1",
+                        "주의사항2"
+                    ]
+                }}
+            }}
+            
+            3. 일정 작성 시 다음 원칙을 지키세요:
+               - 구체적이고 실행 가능한 일정 제시
+               - 사용자의 현재 수준에 맞는 난이도 설정
+               - 점진적 부하 증가 원칙 준수
+               - 충분한 휴식과 회복 시간 확보
+               - 날씨와 개인 일정을 고려한 유연성 확보
+               - 부상 예방을 위한 보조 운동 포함
+            """
+        )
+        
+        return create_react_agent(
+            llm=self.llm,
+            tools=tools,
+            prompt=prompt
+        )
+
 
     def _create_ativity_praise_agent(self, tools: list[Tool]):
         """에이전트 생성"""

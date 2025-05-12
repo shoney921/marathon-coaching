@@ -16,6 +16,8 @@ from app.services.garmin_service import GarminService
 import os
 import aiohttp
 
+from app.services.schedule_service import ScheduleService
+
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
@@ -105,7 +107,7 @@ async def log_requests(request: Request, call_next):
     Response:
     Status Code: {response.status_code}
     Process Time: {process_time:.2f} seconds
-    Body: {response_body}
+    Body: 생략
     """)
     
     # 응답 본문을 다시 설정
@@ -320,6 +322,36 @@ async def request_activity_feedback(
     except Exception as e:
         logger.error(f"피드백 요청 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/activities/race-training/{user_id}")
+async def request_race_training(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    try:
+        # 요청 본문 파싱
+        body = await request.json()
+        race_name = body.get("race_name")
+        race_date = body.get("race_date")
+        race_type = body.get("race_type")
+        race_time = body.get("race_time")
+
+        schedule_service = ScheduleService(db)
+        schedule = await schedule_service.create_race_training_schedule(
+            user_id=user_id,
+            race_name=race_name,
+            race_date=race_date,
+            race_type=race_type,
+            race_time=race_time
+        )
+        return schedule
+    except Exception as e:
+        logger.error(f"훈련 일정 생성 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
 
 ## 유틸 함수
 #region 유틸
