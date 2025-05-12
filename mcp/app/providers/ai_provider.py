@@ -49,7 +49,7 @@ class AIProvider:
             project=os.getenv("GCP_PROJECT_ID", "lge-vs-genai")
         )
 
-    async def analyze_activity(self, user_id: int, query: str, comments: list[str]) -> Dict[str, Any]:
+    async def analyze_activity(self, user_id: int, query: str, comments: list[str], laps: list[dict]) -> Dict[str, Any]:
         """러닝 활동 분석"""
         try:
             # 에이전트 생성 및 실행
@@ -60,6 +60,7 @@ class AIProvider:
             response = await executor.ainvoke({
                 "input": query,
                 "comments": comments,
+                "laps": laps,
                 "today": datetime.now().strftime("%Y-%m-%d")
             })
             
@@ -117,7 +118,98 @@ class AIProvider:
     def _create_ativity_coaching_agent(self, tools: list[Tool]):
         """에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '피드백이 필요한 활동 데이터'에 대한 전문적인 조언을 제공합니다.
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터, 랩 데이터, 코멘트를 종합적으로 분석하여 맞춤형 피드백을 제공합니다.
+            오늘 날짜는 {today}입니다.
+
+            분석해야 할 데이터:
+            1. 활동 데이터: {input}
+            2. 랩 데이터: {laps}
+            3. 사용자 코멘트: {comments}
+
+            사용 가능한 도구들: {tool_names}
+
+            사용 가능한 도구들의 설명:
+            {tools}
+            
+            다음 형식으로 단계별로 진행하세요:
+            
+            Thought: 현재 단계에서 해야 할 일을 설명
+            
+            Action: 사용할 도구 이름
+            
+            Action Input: {{}}  # 도구에 파라미터가 필요 없는 경우 빈 중괄호 사용
+            
+            Observation: 도구의 실행 결과 (JSON 문자열)
+            
+            Thought: 결과를 분석하고 다음 단계 결정
+            
+            Final Answer: 최종 답변 (모든 데이터 수집 후에만 작성)
+            
+            {agent_scratchpad}
+            
+            중요 규칙:
+            1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
+            2. Action Input은 반드시 {{}} 형식으로 작성하세요.
+            3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요.
+            4. Final Answer는 다음 형식으로 작성하세요:
+               a. 활동 개요
+                  - 거리, 시간, 페이스 등 기본 정보 요약
+                  - 심박수, 케이던스 등 생체 데이터 분석
+                  - 랩별 주요 지표 변화 추이
+               
+               b. 랩 분석
+                  - 각 랩의 페이스 변화와 의미
+                  - 심박수 구간별 분포와 훈련 강도
+                  - 케이던스와 보폭의 변화
+                  - 특이사항이 있는 랩의 상세 분석
+               
+               c. 활동 평가
+                  - 목표 대비 성과 분석
+                  - 코멘트에 언급된 특이사항 고려
+                  - 개선된 점과 부족한 점
+                  - 랩 데이터를 통한 훈련 효과 평가
+               
+               d. 맞춤형 조언
+                  - 현재 활동 수준에 맞는 구체적인 개선 방안
+                  - 코멘트에 언급된 문제점에 대한 해결책
+                  - 랩별 페이스 조절 전략
+                  - 다음 활동을 위한 준비사항
+               
+               e. 주의사항 및 팁
+                  - 부상 예방을 위한 주의사항
+                  - 훈련 효과를 높이기 위한 팁
+                  - 영양 및 회복 관련 조언
+                  - 랩 훈련 시 주의할 점
+
+            5. 분석 시 다음 사항을 반드시 고려하세요:
+               - 사용자의 코멘트에 언급된 특이사항
+               - 랩별 페이스 변화와 그 의미
+               - 심박수 구간별 분포와 의미
+               - 케이던스와 보폭의 관계
+               - 훈련 강도와 회복 필요성
+               - 랩 간 휴식 시간의 적절성
+               - 전체적인 훈련 패턴과 목표 달성도
+               
+            6. 답변 작성 시 다음 원칙을 지키세요:
+               - 구체적이고 실행 가능한 조언 제공
+               - 사용자의 현재 수준에 맞는 난이도로 설명
+               - 긍정적인 피드백과 개선점을 균형있게 제시
+               - 전문 용어는 쉽게 설명하여 사용
+               - 랩 데이터를 통한 객관적인 분석 제공
+               - 개인적인 코멘트와 데이터를 연계한 맞춤형 조언
+            """
+        )
+        
+        return create_react_agent(
+            llm=self.llm,
+            tools=tools,
+            prompt=prompt
+        )
+
+    def _create_ativity_praise_agent(self, tools: list[Tool]):
+        """에이전트 생성"""
+        prompt = PromptTemplate.from_template(
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '질문'에 대한 전문적인 조언을 제공합니다.
             오늘 날짜는 {today}입니다. 조회한 데이터들의 시간 순서들도 잘 고려해서 질문의 답변을 해주세요. 
             심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 질문에 대한 답변을 해주세요.
             
@@ -126,9 +218,7 @@ class AIProvider:
             사용 가능한 도구들의 설명:
             {tools}
             
-            피드백이 필요한 활동 데이터 : {input}
-
-            해당 활동에 대한 활동노트 : {comments}
+            질문 : {input}
             
             다음 형식으로 단계별로 진행하세요:
             

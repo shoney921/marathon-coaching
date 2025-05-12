@@ -54,11 +54,12 @@ class RunningController:
             user_id = request.parameters.get("user_id")
             query = request.parameters.get("query")
             comments = request.parameters.get("comments")
+            laps = request.parameters.get("laps")
             
             if not user_id or not query:
                 raise MCPError("user_id and query are required", "MISSING_PARAMETER")
             
-            analysis = await self.ai_provider.analyze_activity(user_id, query, comments)
+            analysis = await self.ai_provider.analyze_activity(user_id, query, comments, laps)
             return MCPResponse(
                 status="success",
                 data={"analysis": analysis}

@@ -265,6 +265,7 @@ async def request_activity_feedback(
         # 1. 활동 데이터 조회
         activity_service = ActivityService(db)
         activity = activity_service.get_activity(activity_id)
+        laps = activity_service.get_activity_laps(activity_id)
         
         if not activity:
             logger.error(f"Activity not found for ID: {activity_id}")
@@ -282,7 +283,8 @@ async def request_activity_feedback(
                     "parameters": {
                         "user_id": activity["user_id"],
                         "query": f"{activity}",
-                        "comments": comments
+                        "comments": comments,
+                        "laps": laps
                     }
                 }
             ) as response:

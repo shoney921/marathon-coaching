@@ -473,6 +473,24 @@ class ActivityService:
         """
         feedback = self.db.query(ActivityFeedback).filter(ActivityFeedback.activity_id == activity_id).first()
         return feedback
+    
+    def get_activity_laps(self, activity_id: int):
+        """
+        활동의 랩 데이터를 조회합니다.
+        
+        Args:
+            activity_id (int): 활동 ID
+        """
+        laps = self.db.query(ActivitySplit).filter(ActivitySplit.activity_id == activity_id).all()
+        return [{
+            "lap_index": lap.lap_index,
+            "distance": lap.distance,
+            "duration": lap.duration,
+            "average_speed": self._format_pace(lap.average_speed),
+            "average_hr": lap.average_hr,
+            "max_hr": lap.max_hr,
+            "average_run_cadence": lap.average_run_cadence,
+        } for lap in laps]
 
     def _format_duration(self, seconds: float) -> str:
         """
