@@ -13,6 +13,8 @@ from app.models.user import User
 from app.models.training import TrainingLog, SleepLog
 from app.services.activity_service import ActivityService
 from app.services.garmin_service import GarminService
+import os
+import aiohttp
 
 # 로깅 설정
 logging.basicConfig(
@@ -248,6 +250,64 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
     garmin_service = GarminService(db)
     return garmin_service.sync_activities(user_id, user_data.garmin_email, user_data.garmin_password)
 
+@app.post("/activities/feedback/{activity_id}")
+async def request_activity_feedback(activity_id: int, db: Session = Depends(get_db)):
+    try:
+        # 1. 활동 데이터 조회
+        activity_service = ActivityService(db)
+        activity = activity_service.get_activity(activity_id)
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+
+        # 2. MCP 서버에 피드백 요청
+        mcp_url = os.getenv("MCP_URL", "http://localhost:8000")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{mcp_url}/mcp",
+                json={
+                    "action": "analyze_activity",
+                    "parameters": {
+                        "user_id": activity["user_id"],
+                        "query": f"이 러닝 활동에 대한 피드백을 제공해주세요: {activity}"
+                    }
+                }
+            ) as response:
+                print("## response")
+                # print(response)
+                print(response.status)
+                if response.status == 200:
+                    mcp_response = await response.json()
+                    print("## mcp_response")
+                    print(mcp_response)
+                    
+                    # 3. 피드백 결과 저장
+                    feedback_data = {
+                        "user_id": activity["user_id"],
+                        "activity_id": activity_id,
+                        "feedback_data": mcp_response["data"]["analysis"]["analysis"],  # feedback을 content로 변경
+                        "created_at": datetime.now()
+                    }
+                    
+                    try:
+                        feedback = activity_service.save_activity_feedback(feedback_data)
+                        return feedback
+                    except Exception as e:
+                        logger.error(f"피드백 저장 실패: {str(e)}")
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"피드백 저장 중 오류 발생: {str(e)}"
+                        )
+                else:
+                    error_response = await response.text()
+                    logger.error(f"MCP 서버 응답 실패: {error_response}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"MCP 서버로부터 피드백을 받지 못했습니다: {error_response}"
+                    )
+
+    except Exception as e:
+        logger.error(f"피드백 요청 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 ## 유틸 함수
 #region 유틸

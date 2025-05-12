@@ -378,7 +378,7 @@ with tab5:
                 
                 # 활동에 대한 댓글 입력
                 st.write("---")
-                st.write("💬 자신의 활동에 댓글을 남겨보세요(AI에게 핑계를 전달할 수 있어요)")
+                st.write("💬 자신의 활동에 댓글을 남겨보세요(피드백 요청 전에 작성하면,AI에게 핑계를 전달할 수 있어요)")
                 
                 # 기존 댓글들 표시
                 if activity['comments']:
@@ -446,18 +446,25 @@ with tab5:
                     else:
                         st.warning("댓글을 입력해주세요.")
 
-                # 피드백 버튼
-                if st.button("활동 피드백 요청", key=f"feedback_{activity['activity_id']}"):
-                    print("피드백 요청")
-                    # TODO: 피드백 요청 API 호출  
-                    # response = requests.post(
-                    #     f"{API_BASE_URL}/activities/feedback/{activity['activity_id']}",
-                    #     headers={"Authorization": f"Bearer {st.session_state.token}"}
-                    # )
-                    # if response.status_code == 200:
-                    #     st.success("피드백 요청이 완료되었습니다.")
-                    # else:
-                    #     st.error("피드백 요청에 실패했습니다.")
+                if activity['feedback']:
+                    st.write("#### 활동 피드백")
+                    st.write(f"{activity['feedback']}")
+                else:
+                    # 피드백 버튼
+                    if st.button("활동 피드백 요청", key=f"feedback_{activity['activity_id']}"):
+                        try:
+                            response = requests.post(
+                                f"{API_BASE_URL}/activities/feedback/{activity['activity_id']}",
+                                headers={"Authorization": f"Bearer {st.session_state.token}"}
+                            )
+                            if response.status_code == 200:
+                                feedback = response.json()
+                                st.success("피드백이 생성되었습니다.")
+                                st.rerun()
+                            else:
+                                st.error("피드백 요청에 실패했습니다.")
+                        except Exception as e:
+                            st.error(f"피드백 요청 중 오류가 발생했습니다: {str(e)}")
     else:
         st.info("등록된 활동 기록이 없습니다.") 
 

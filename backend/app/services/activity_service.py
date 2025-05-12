@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.models.activity import Activity, ActivityComment, ActivitySplit
+from app.models.activity import Activity, ActivityComment, ActivityFeedback, ActivitySplit
 from garminconnect import Garmin
 import logging
 
@@ -208,6 +208,7 @@ class ActivityService:
         for activity in activities:
             laps = self.db.query(ActivitySplit).filter(ActivitySplit.activity_id == activity.activity_id).all()
             comments = self.db.query(ActivityComment).filter(ActivityComment.activity_id == activity.activity_id).all()
+            feedback = self.db.query(ActivityFeedback).filter(ActivityFeedback.activity_id == activity.activity_id).first()
             laps_data = []
             comments_data = []
             
@@ -254,7 +255,8 @@ class ActivityService:
                 "average_hr": activity.average_hr,
                 "max_hr": activity.max_hr,
                 "laps": laps_data,
-                "comments": comments_data
+                "comments": comments_data,
+                "feedback": feedback.feedback_data if feedback else None
             })
 
         return response
@@ -437,6 +439,40 @@ class ActivityService:
         except Exception as e:
             logger.error(f"Error fetching splits data: {str(e)}")
             raise
+
+    def save_activity_feedback(self, feedback_data: dict):
+        """
+        활동에 대한 피드백을 저장합니다.
+        
+        Args:
+            activity_id (int): 활동 ID
+            feedback (str): 피드백 내용
+            
+        Returns:
+            dict: 성공 메시지
+        """
+        feedback = ActivityFeedback(
+            user_id=feedback_data.get('user_id'),
+            activity_id=feedback_data.get('activity_id'),
+            feedback_data=feedback_data.get('feedback_data'),
+            created_at=datetime.now()
+        )
+        self.db.add(feedback)
+        self.db.commit()
+        return {"message": "Activity feedback saved successfully"}
+    
+    def get_activity_feedback(self, activity_id: int):
+        """
+        활동에 대한 피드백을 조회합니다.
+        
+        Args:
+            activity_id (int): 활동 ID
+            
+        Returns:
+            dict: 피드백 정보
+        """
+        feedback = self.db.query(ActivityFeedback).filter(ActivityFeedback.activity_id == activity_id).first()
+        return feedback
 
     def _format_duration(self, seconds: float) -> str:
         """
