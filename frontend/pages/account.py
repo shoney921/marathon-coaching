@@ -119,11 +119,11 @@ if user_data:
             else:
                 st.error("회원 정보 수정에 실패했습니다.") 
 
-    st.subheader("가민 연동 정보 수정")
+    st.subheader("가민 연동")
     with st.form(key="edit_garmin_sync_form"):
         if user_data['garmin_sync_status'] == "success":
             garmin_email = user_data['garmin_email']
-            st.success("가민 연동 정보가 이미 성공적으로 연동되었습니다.")
+            st.success("가민 연동 정보가 성공적으로 연동되었습니다.")
             st.write(f"가민 이메일: {garmin_email}")
             disconnect_button = st.form_submit_button(label="가민 연동 해제")
             
@@ -140,7 +140,7 @@ if user_data:
         else:
             garmin_email = st.text_input("가민 이메일", value=user_data['garmin_email'])
             garmin_password = st.text_input("가민 비밀번호", type="password")
-            connect_button = st.form_submit_button(label="가민 연동 정보 수정")
+            connect_button = st.form_submit_button(label="가민 연동")
 
             if connect_button:
                 if garmin_email and garmin_password:
@@ -153,7 +153,9 @@ if user_data:
                         # 가민 연동 정보 수정
                         response = update_garmin_sync(update_data)
                         if response and response.get("garmin_sync_status") == "success":
-                            st.success("가민 연동 정보가 성공적으로 수정되었습니다.")
+                            st.success("가민 연동 정보가 성공적으로 등록되었습니다.")
+                            st.session_state.garmin_email = garmin_email
+                            st.session_state.garmin_password = garmin_password
                             st.rerun()
                         else:
                             error_message = response.get("detail", "가민 연동 정보 수정에 실패했습니다.")
