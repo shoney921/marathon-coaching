@@ -148,6 +148,57 @@ def format_duration(duration_str):
     except:
         return duration_str
 
+def get_schedules():
+    mock_schedules = [
+        {
+            "id": 1,
+            "title": "기초 체력 훈련2",
+            "datetime": datetime.now().replace(hour=9, minute=0).isoformat(),
+            "description": "30분 러닝 + 스트레칭",
+            "type": "훈련"
+        },
+        {
+            "id": 2,
+            "title": "서울 마라톤",
+            "datetime": (datetime.now() + timedelta(days=7)).replace(hour=8, minute=0).isoformat(),
+            "description": "2024 서울 마라톤 대회",
+            "type": "대회"
+        },
+        {
+            "id": 3,
+            "title": "휴식일",
+            "datetime": (datetime.now() + timedelta(days=2)).replace(hour=0, minute=0).isoformat(),
+            "description": "완전 휴식",
+            "type": "휴식"
+        },
+        {
+            "id": 4,
+            "title": "영양사 상담",
+            "datetime": (datetime.now() + timedelta(days=3)).replace(hour=14, minute=30).isoformat(),
+            "description": "마라톤 대비 영양 상담",
+            "type": "기타"
+        },
+        {
+            "id": 5,
+            "title": "인터벌 훈련",
+            "datetime": (datetime.now() + timedelta(days=1)).replace(hour=18, minute=0).isoformat(),
+            "description": "400m x 10세트 인터벌 훈련",
+            "type": "훈련"
+        }
+    ]
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/schedules/user/{st.session_state.user['id']}",
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return mock_schedules
+    except requests.exceptions.RequestException as e:
+        st.error(f"API 연결 오류: {str(e)}")
+    return []
+
 # 탭 생성
 tab1, tab5, tab6 = st.tabs(["홈", "활동 기록", "일정 관리"])
 
@@ -493,25 +544,7 @@ with tab5:
 with tab6:
     st.title("📅 일정 관리")
 
-    if st.button("훈련 일정 생성"):
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}/activities/race-training/{st.session_state.user['id']}",
-                headers={"Authorization": f"Bearer {st.session_state.token}"},
-                json={"race_name": "서울 마라톤", "race_date": "2024-10-12", "race_type": "마라톤", "race_time": "04:00:00"}
-            )
-            
-            if response.status_code == 200:
-                schedule_data = response.json()
-                st.success("훈련 일정 생성 완료")
-                st.json(schedule_data)  # JSON 형식으로 보기 좋게 표시
-            else:
-                error_detail = response.json().get('detail', '알 수 없는 오류가 발생했습니다.')
-                st.error(f"훈련 일정 생성 실패: {error_detail}")
-        except requests.exceptions.RequestException as e:
-            st.error(f"서버 연결 오류: {str(e)}")
-        except ValueError as e:
-            st.error(f"응답 처리 오류: {str(e)}")
+
     
     # 일정 추가 폼
     with st.expander("➕ 새로운 일정 추가하기"):
@@ -553,52 +586,16 @@ with tab6:
                         st.error(f"일정 추가 중 오류가 발생했습니다: {str(e)}")
     
     # 달력 뷰와 리스트 뷰를 탭으로 구분
-    calendar_tab, list_tab = st.tabs(["📅 달력 보기", "📋 목록 보기"])
+    calendar_tab, list_tab, agent_tab = st.tabs(["📅 달력 보기", "📋 목록 보기", "🤖일정 에이전트"])
     
-    # 임시 하드코딩된 일정 데이터
-    mock_schedules = [
-        {
-            "id": 1,
-            "title": "기초 체력 훈련",
-            "datetime": datetime.now().replace(hour=9, minute=0).isoformat(),
-            "description": "30분 러닝 + 스트레칭",
-            "type": "훈련"
-        },
-        {
-            "id": 2,
-            "title": "서울 마라톤",
-            "datetime": (datetime.now() + timedelta(days=7)).replace(hour=8, minute=0).isoformat(),
-            "description": "2024 서울 마라톤 대회",
-            "type": "대회"
-        },
-        {
-            "id": 3,
-            "title": "휴식일",
-            "datetime": (datetime.now() + timedelta(days=2)).replace(hour=0, minute=0).isoformat(),
-            "description": "완전 휴식",
-            "type": "휴식"
-        },
-        {
-            "id": 4,
-            "title": "영양사 상담",
-            "datetime": (datetime.now() + timedelta(days=3)).replace(hour=14, minute=30).isoformat(),
-            "description": "마라톤 대비 영양 상담",
-            "type": "기타"
-        },
-        {
-            "id": 5,
-            "title": "인터벌 훈련",
-            "datetime": (datetime.now() + timedelta(days=1)).replace(hour=18, minute=0).isoformat(),
-            "description": "400m x 10세트 인터벌 훈련",
-            "type": "훈련"
-        }
-    ]
+    # 실제 일정 데이터 가져오기
+    schedules = get_schedules()
     
     # 달력 뷰
     with calendar_tab:
         # 일정 데이터를 달력 형식으로 변환
         calendar_events = []
-        for schedule in mock_schedules:
+        for schedule in schedules:
             event_datetime = datetime.fromisoformat(schedule['datetime'])
             calendar_events.append({
                 "title": schedule['title'],
@@ -645,7 +642,7 @@ with tab6:
     # 리스트 뷰
     with list_tab:
         st.subheader("일정 목록")
-        for schedule in mock_schedules:
+        for schedule in schedules:
             event_datetime = datetime.fromisoformat(schedule['datetime'])
             formatted_datetime = event_datetime.strftime('%Y년 %m월 %d일 - %H시 %M분')
             
@@ -658,4 +655,64 @@ with tab6:
                     st.success("일정이 삭제되었습니다.")
                     st.rerun()
 
+    # 일정 생성 에이전트
+    with agent_tab:
+        st.title("🤖 일정 에이전트")
+        st.write("일정 생성 에이전트는 현재 훈련 일정을 참고하여 새로운 일정을 생성합니다.")
+        # 목표 대회 정보 입력 폼
+        with st.form("race_target_form"):
+            st.subheader("🎯 목표 대회 정보")
+            
+            race_name = st.text_input("목표 대회명", placeholder="예: 서울 마라톤")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                race_type = st.selectbox(
+                    "대회 타입",
+                    options=["풀 마라톤(42.195km)", "하프 마라톤(21.0975km)", "10K", "5K"],
+                    format_func=lambda x: x.split("(")[0] if "(" in x else x
+                )
+            
+            with col2:
+                time_col1, time_col2, time_col3 = st.columns(3)
+                with time_col1:
+                    hours = st.number_input("목표 시간", min_value=0, max_value=23, value=4)
+                with time_col2:
+                    minutes = st.number_input("분", min_value=0, max_value=59, value=0)
+                with time_col3:
+                    seconds = st.number_input("초", min_value=0, max_value=59, value=0)
+                
+                target_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            
+            submit_button = st.form_submit_button("목표 설정")
+            
+            if submit_button:
+                if not race_name:
+                    st.error("목표 대회명을 입력해주세요.")
+                else:
+                    st.success(f"""목표가 설정되었습니다!
+                    - 대회명: {race_name}
+                    - 대회 타입: {race_type}
+                    - 목표 시간: {target_time}""")
+                    try:
+                        response = requests.post(
+                            f"{API_BASE_URL}/activities/race-training/{st.session_state.user['id']}",
+                            headers={"Authorization": f"Bearer {st.session_state.token}"},
+                            json={"race_name": "서울 마라톤", "race_date": "2024-10-12", "race_type": "마라톤", "race_time": "04:00:00"}
+                        )
+                        
+                        if response.status_code == 200:
+                            schedule_data = response.json()
+                            st.success("훈련 일정 생성 완료")
+                            st.json(schedule_data)  # JSON 형식으로 보기 좋게 표시
+                        else:
+                            error_detail = response.json().get('detail', '알 수 없는 오류가 발생했습니다.')
+                            st.error(f"훈련 일정 생성 실패: {error_detail}")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"서버 연결 오류: {str(e)}")
+                    except ValueError as e:
+                        st.error(f"응답 처리 오류: {str(e)}")
+
+                
     
