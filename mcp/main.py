@@ -16,6 +16,8 @@ from google.cloud import aiplatform
 import logging
 import json
 import aiohttp
+from app.protocols.mcp_protocol import MCPRequest, MCPResponse
+from app.controllers.running_controller import RunningController
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -412,11 +414,11 @@ class RunningActivityAgent:
 # API 엔드포인트
 @app.get("/health")
 async def health_check():
+    """서버 상태 확인 엔드포인트"""
     return {
         "status": "healthy",
-        "gcp_initialized": "GOOGLE_APPLICATION_CREDENTIALS" in os.environ,
-        "model": MODEL_NAME,
-        "backend_url": BACKEND_URL
+        "protocol": "MCP",
+        "version": "1.0"
     }
 
 @app.get("/test-backend")
@@ -493,7 +495,20 @@ async def startup_event():
     for route in app.routes:
         logger.info(f"Route: {route.path}, Methods: {route.methods}")
 
+@app.post("/mcp")
+async def handle_mcp_request(request: MCPRequest) -> MCPResponse:
+    """MCP 프로토콜 요청을 처리하는 엔드포인트"""
+    try:
+        logger.info(f"Received MCP request: {request}")
+        controller = RunningController()
+        response = await controller.handle_request(request)
+        logger.info(f"MCP response: {response}")
+        return response
+    except Exception as e:
+        logger.error(f"Error handling MCP request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting server...")
+    logger.info("Starting MCP server...")
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True) 
