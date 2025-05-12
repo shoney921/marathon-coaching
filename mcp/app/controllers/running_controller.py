@@ -2,6 +2,9 @@ from typing import Dict, Any
 from ..protocols.mcp_protocol import MCPRequest, MCPResponse, MCPError
 from ..providers.backend_provider import BackendProvider
 from ..providers.ai_provider import AIProvider
+import logging
+
+logger = logging.getLogger(__name__)
 
 class RunningController:
     def __init__(self):
@@ -47,13 +50,23 @@ class RunningController:
         )
 
     async def _handle_analyze_activity(self, request: MCPRequest) -> MCPResponse:
-        user_id = request.parameters.get("user_id")
-        query = request.parameters.get("query")
-        if not user_id or not query:
-            raise MCPError("user_id and query are required", "MISSING_PARAMETER")
-        
-        analysis = await self.ai_provider.analyze_activity(user_id, query)
-        return MCPResponse(
-            status="success",
-            data={"analysis": analysis}
-        ) 
+        try:
+            user_id = request.parameters.get("user_id")
+            query = request.parameters.get("query")
+            comments = request.parameters.get("comments")
+            
+            if not user_id or not query:
+                raise MCPError("user_id and query are required", "MISSING_PARAMETER")
+            
+            analysis = await self.ai_provider.analyze_activity(user_id, query, comments)
+            return MCPResponse(
+                status="success",
+                data={"analysis": analysis}
+            )
+        except Exception as e:
+            logger.error(f"Activity analysis failed: {str(e)}")
+            return MCPResponse(
+                status="error",
+                error=str(e),
+                data=None
+            ) 

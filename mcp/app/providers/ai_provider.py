@@ -49,16 +49,17 @@ class AIProvider:
             project=os.getenv("GCP_PROJECT_ID", "lge-vs-genai")
         )
 
-    async def analyze_activity(self, user_id: int, query: str) -> Dict[str, Any]:
+    async def analyze_activity(self, user_id: int, query: str, comments: list[str]) -> Dict[str, Any]:
         """러닝 활동 분석"""
         try:
             # 에이전트 생성 및 실행
             tools = await self._create_tools(user_id)
-            agent = self._create_agent(tools)
+            agent = self._create_ativity_coaching_agent(tools)
             executor = self._create_executor(agent, tools)
             
             response = await executor.ainvoke({
                 "input": query,
+                "comments": comments,
                 "today": datetime.now().strftime("%Y-%m-%d")
             })
             
@@ -113,10 +114,10 @@ class AIProvider:
             )
         ]
 
-    def _create_agent(self, tools: list[Tool]):
+    def _create_ativity_coaching_agent(self, tools: list[Tool]):
         """에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 20년차 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 질문에 대한 전문적인 조언을 제공합니다.
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '피드백이 필요한 활동 데이터'에 대한 전문적인 조언을 제공합니다.
             오늘 날짜는 {today}입니다. 조회한 데이터들의 시간 순서들도 잘 고려해서 질문의 답변을 해주세요. 
             심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 질문에 대한 답변을 해주세요.
             
@@ -125,7 +126,9 @@ class AIProvider:
             사용 가능한 도구들의 설명:
             {tools}
             
-            질문: {input}
+            피드백이 필요한 활동 데이터 : {input}
+
+            해당 활동에 대한 활동노트 : {comments}
             
             다음 형식으로 단계별로 진행하세요:
             
@@ -155,10 +158,9 @@ class AIProvider:
             9. GetRunningActivities와 GetMonthlyActivitySummary 도구는 각각 한 번만 사용하세요.
             10. 두 도구의 결과를 모두 수집했다면, 바로 Final Answer를 작성하세요.
             11. Final Answer는 다음 형식으로 작성하세요:
-                - 현재 상태 분석
-                - 목표 달성을 위한 구체적인 조언
-                - 훈련 계획 제안
-                - 주의사항 및 팁
+                - 활동에 대한 분석
+                - 활동에 대한 조언
+                - 활동에 대한 주의사항 및 팁
             """
         )
         
@@ -176,6 +178,7 @@ class AIProvider:
             verbose=True,
             return_intermediate_steps=True,
             handle_parsing_errors=True,
-            max_iterations=5,  # 반복 횟수 조정
-            max_execution_time=300,  # 5분으로 제한
+            max_iterations=20,  # 최대 반복 횟수를 2로 제한
+            max_execution_time=600,
+            early_stopping_method="generate"  # 조기 종료 메서드 추가
         ) 

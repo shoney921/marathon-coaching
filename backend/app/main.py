@@ -251,14 +251,27 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
     return garmin_service.sync_activities(user_id, user_data.garmin_email, user_data.garmin_password)
 
 @app.post("/activities/feedback/{activity_id}")
-async def request_activity_feedback(activity_id: int, db: Session = Depends(get_db)):
+async def request_activity_feedback(
+    activity_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     try:
+        # 요청 본문 파싱
+        body = await request.json()
+        comments = body.get("comments", [])
+        logger.info(f"## comments: {comments}")
+        
         # 1. 활동 데이터 조회
         activity_service = ActivityService(db)
         activity = activity_service.get_activity(activity_id)
+        
         if not activity:
-            raise HTTPException(status_code=404, detail="Activity not found")
+            logger.error(f"Activity not found for ID: {activity_id}")
+            raise HTTPException(status_code=404, detail=f"Activity not found for ID: {activity_id}")
 
+        logger.info(f"## activity: {activity}")
+        
         # 2. MCP 서버에 피드백 요청
         mcp_url = os.getenv("MCP_URL", "http://localhost:8000")
         async with aiohttp.ClientSession() as session:
@@ -268,23 +281,20 @@ async def request_activity_feedback(activity_id: int, db: Session = Depends(get_
                     "action": "analyze_activity",
                     "parameters": {
                         "user_id": activity["user_id"],
-                        "query": f"이 러닝 활동에 대한 피드백을 제공해주세요: {activity}"
+                        "query": f"{activity}",
+                        "comments": comments
                     }
                 }
             ) as response:
-                print("## response")
-                # print(response)
-                print(response.status)
                 if response.status == 200:
                     mcp_response = await response.json()
-                    print("## mcp_response")
-                    print(mcp_response)
-                    
+                    logger.info(f"## mcp_response: {mcp_response}")
+
                     # 3. 피드백 결과 저장
                     feedback_data = {
                         "user_id": activity["user_id"],
                         "activity_id": activity_id,
-                        "feedback_data": mcp_response["data"]["analysis"]["analysis"],  # feedback을 content로 변경
+                        "feedback_data": mcp_response["data"]["analysis"]["analysis"],
                         "created_at": datetime.now()
                     }
                     

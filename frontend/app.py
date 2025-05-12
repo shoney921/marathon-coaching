@@ -453,9 +453,12 @@ with tab5:
                     # 피드백 버튼
                     if st.button("활동 피드백 요청", key=f"feedback_{activity['activity_id']}"):
                         try:
+                            comments = [comment['comment'] for comment in activity['comments']]
+                            
                             response = requests.post(
                                 f"{API_BASE_URL}/activities/feedback/{activity['activity_id']}",
-                                headers={"Authorization": f"Bearer {st.session_state.token}"}
+                                headers={"Authorization": f"Bearer {st.session_state.token}"},
+                                json={"comments": comments}
                             )
                             if response.status_code == 200:
                                 feedback = response.json()
