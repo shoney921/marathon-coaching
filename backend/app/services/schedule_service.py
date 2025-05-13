@@ -175,3 +175,32 @@ class ScheduleService:
         except Exception as e:
             logger.error(f"훈련 일정 저장 실패: {str(e)}")
             raise
+
+    def delete_schedule(self, schedule_id: int, user_id: int) -> Dict[str, Any]:
+        """
+        훈련 일정 삭제
+        
+        Args:
+            schedule_id: 일정 ID
+            user_id: 사용자 ID
+        Returns:
+            삭제된 일정 정보
+        """
+        try:
+            schedule = self.db.query(TrainingSchedule).filter(
+                TrainingSchedule.id == schedule_id,
+                TrainingSchedule.user_id == user_id
+            ).first()
+            
+            if not schedule:
+                raise Exception("일정을 찾을 수 없습니다.")
+            
+            self.db.delete(schedule)
+            self.db.commit()
+            
+            return schedule.to_dict()
+        
+        except Exception as e:
+            logger.error(f"훈련 일정 삭제 중 오류 발생: {str(e)}")
+            raise
+        

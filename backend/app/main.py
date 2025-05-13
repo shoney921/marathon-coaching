@@ -186,7 +186,9 @@ async def update_garmin_sync(user_id: int, garmin_data: dict, db: Session = Depe
 
 @app.post("/auth/login/")
 async def login(user_data: dict, db: Session = Depends(get_db)):
+    logger.info(f"## user_data: {user_data}")
     user = db.query(User).filter(User.email == user_data["email"]).first()
+    logger.info(f"## user: {user}")
     if not user or not user.verify_password(user_data["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"message": "Login successful", "user": user, "token": "1234567890"}
@@ -252,7 +254,7 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
     garmin_service = GarminService(db)
     return garmin_service.sync_activities(user_id, user_data.garmin_email, user_data.garmin_password)
 
-@app.post("/activities/feedback/{activity_id}")
+@app.post("/activities/feedback/{user_id}/{activity_id}")
 async def request_activity_feedback(
     user_id: int,
     activity_id: int,
@@ -268,6 +270,7 @@ async def request_activity_feedback(
         # 1. 활동 데이터 조회
         activity_service = ActivityService(db)
         activity = activity_service.get_activity(user_id, activity_id)
+        
         laps = activity_service.get_activity_laps(activity_id)
         
         if not activity:
@@ -358,6 +361,11 @@ async def create_training_schedule(
 async def get_training_schedule(user_id: int, db: Session = Depends(get_db)):
     schedule_service = ScheduleService(db)
     return schedule_service.get_user_schedules(user_id)
+
+@app.delete("/activities/training-schedule/{user_id}/{schedule_id}")
+async def delete_training_schedule(user_id: int, schedule_id: int, db: Session = Depends(get_db)):
+    schedule_service = ScheduleService(db)
+    return schedule_service.delete_schedule(schedule_id, user_id)
 
 ## 유틸 함수
 #region 유틸

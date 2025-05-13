@@ -166,6 +166,21 @@ def get_schedules():
         st.error(f"API 연결 오류: {str(e)}")
     return []
 
+def delete_schedule(schedule_id):
+    try:
+        response = requests.delete(
+            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}/{schedule_id}",
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"응답 처리 오류: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"API 연결 오류: {str(e)}")
+        return None
+
 # 탭 생성
 tab1, tab5, tab6 = st.tabs(["홈", "활동 기록", "일정 관리"])
 
@@ -474,7 +489,7 @@ with tab5:
                             comments = [comment['comment'] for comment in activity['comments']]
                             
                             response = requests.post(
-                                f"{API_BASE_URL}/activities/feedback/{activity['activity_id']}",
+                                f"{API_BASE_URL}/activities/feedback/{st.session_state.user['id']}/{activity['activity_id']}",
                                 headers={"Authorization": f"Bearer {st.session_state.token}"},
                                 json={"comments": comments}
                             )
@@ -510,45 +525,14 @@ with tab5:
 # 일정 관리 페이지
 with tab6:
     st.title("📅 일정 관리")
-
-    # 일정 추가 폼
-    with st.expander("➕ 새로운 일정 추가하기"):
-        with st.form(key="schedule_form"):
-            event_title = st.text_input("일정 제목")
-            event_date = st.date_input("날짜")
-            event_time = st.time_input("시간")
-            event_description = st.text_area("설명")
-            event_type = st.selectbox("일정 유형", ["훈련", "대회", "휴식", "기타"])
-            
-            # 일정 유형에 따른 색상 매핑
-            color_mapping = {
-                "훈련": "#4CAF50",  # 초록색
-                "대회": "#FF5722",  # 주황색
-                "휴식": "#2196F3",  # 파란색
-                "기타": "#9C27B0"   # 보라색
-            }
-            
-            submit_button = st.form_submit_button("일정 추가")
-            
-            if submit_button:
-                if not event_title:
-                    st.error("일정 제목을 입력해주세요.")
-                else:
-                    try:
-                        event_datetime = datetime.combine(event_date, event_time)
-                        event_data = {
-                            "title": event_title,
-                            "datetime": event_datetime.isoformat(),
-                            "description": event_description,
-                            "type": event_type,
-                            "user_id": st.session_state.user['id']
-                        }
-                        
-                        # 임시로 성공 메시지만 표시
-                        st.success("일정이 성공적으로 추가되었습니다.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"일정 추가 중 오류가 발생했습니다: {str(e)}")
+    
+    # 일정 유형에 따른 색상 매핑
+    color_mapping = {
+        "훈련": "#4CAF50",  # 초록색
+        "대회": "#FF5722",  # 주황색
+        "휴식": "#2196F3",  # 파란색
+        "기타": "#9C27B0"   # 보라색
+    }
     
     # 실제 일정 데이터 가져오기
     schedules = get_schedules()
@@ -619,13 +603,11 @@ with tab6:
             if calendar_result:
                 # 선택된 일정 정보를 깔끔하게 표시
                 with st.container():
-                    st.subheader("📅 선택된 일정 정보")
-                    
                     if isinstance(calendar_result, dict) and 'eventClick' in calendar_result:
                         event = calendar_result['eventClick']['event']
+                        st.subheader(f"📅 {event.get('title', '정보 없음')}")
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.write("**제목:**", event.get('title', '정보 없음'))
                             # 시작 시간 포맷팅 (한국 시간대 고려)
                             start_time = event.get('start', '').replace('+09:00', '')
                             st.write("**시작 시간:**", start_time.replace('T', ' '))
@@ -633,15 +615,47 @@ with tab6:
                             # 종료 시간 포맷팅 (한국 시간대 고려)
                             end_time = event.get('end', '').replace('+09:00', '')
                             st.write("**종료 시간:**", end_time.replace('T', ' '))
-                            st.write("**설명:**", event.get('extendedProps', {}).get('description', '정보 없음'))
+                        st.write("**설명:**")
+                        st.write(event.get('extendedProps', {}).get('description', '정보 없음'))
                     else:
                         st.info("일정을 선택하면 상세 정보가 표시됩니다.")
                 
-                # st.write("선택된 일정:", calendar_result)
     
     # 리스트 뷰
     with list_tab:
         st.subheader("일정 목록")
+
+        # 일정 추가 폼
+        with st.expander("➕ 새로운 일정 추가하기"):
+            with st.form(key="schedule_form"):
+                event_title = st.text_input("일정 제목")
+                event_date = st.date_input("날짜")
+                event_time = st.time_input("시간")
+                event_description = st.text_area("설명")
+                event_type = st.selectbox("일정 유형", ["훈련", "대회", "휴식", "기타"])
+                
+                submit_button = st.form_submit_button("일정 추가")
+                
+                if submit_button:
+                    if not event_title:
+                        st.error("일정 제목을 입력해주세요.")
+                    else:
+                        try:
+                            event_datetime = datetime.combine(event_date, event_time)
+                            event_data = {
+                                "title": event_title,
+                                "datetime": event_datetime.isoformat(),
+                                "description": event_description,
+                                "type": event_type,
+                                "user_id": st.session_state.user['id']
+                            }
+                            
+                            # 임시로 성공 메시지만 표시
+                            st.success("일정이 성공적으로 추가되었습니다.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"일정 추가 중 오류가 발생했습니다: {str(e)}")
+
         for schedule in schedules:
             event_datetime = datetime.fromisoformat(schedule['datetime'])
             formatted_datetime = event_datetime.strftime('%Y년 %m월 %d일 - %H시 %M분')
@@ -652,8 +666,12 @@ with tab6:
                 
                 # 일정 삭제 버튼
                 if st.button("🗑️ 삭제", key=f"delete_schedule_{schedule['id']}"):
-                    st.success("일정이 삭제되었습니다.")
-                    st.rerun()
+                    response = delete_schedule(schedule['id'])
+                    if response is not None:
+                        st.success("일정이 삭제되었습니다.")
+                        st.rerun()
+                    else:
+                        st.error("일정 삭제에 실패했습니다.")
 
     # 일정 생성 에이전트
     with agent_tab:
