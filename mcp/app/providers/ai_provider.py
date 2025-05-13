@@ -42,10 +42,9 @@ class AIProvider:
         return ChatVertexAI(
             model_name=self.model_name,
             temperature=0,
-            max_output_tokens=4096,
+            max_output_tokens=2048,  # 토큰 수 제한
             top_p=0.8,
             top_k=40,
-            location=os.getenv("GCP_LOCATION", "us-central1"),
             project=os.getenv("GCP_PROJECT_ID", "lge-vs-genai")
         )
 
@@ -79,7 +78,9 @@ class AIProvider:
         """에이전트 도구 생성"""
         async def get_activities_wrapper(_):
             try:
+                logger.info("GetRunningActivities 도구 실행 시작")
                 result = await self.backend_provider.get_running_activities(user_id)
+                logger.info(f"GetRunningActivities 결과: {result}")
                 import json
                 return json.dumps(result, ensure_ascii=False)
             except Exception as e:
@@ -88,7 +89,9 @@ class AIProvider:
         
         async def get_monthly_summary_wrapper(_):
             try:
+                logger.info("GetMonthlyActivitySummary 도구 실행 시작")
                 result = await self.backend_provider.get_monthly_activity_summary(user_id)
+                logger.info(f"GetMonthlyActivitySummary 결과: {result}")
                 import json
                 return json.dumps(result, ensure_ascii=False)
             except Exception as e:
@@ -98,21 +101,28 @@ class AIProvider:
         # 비동기 함수를 동기 함수로 래핑
         def sync_get_activities(_):
             try:
+                logger.info("sync_get_activities 시작")
                 loop = asyncio.get_event_loop()
             except RuntimeError:
+                logger.info("새로운 이벤트 루프 생성")
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
+            logger.info("get_activities_wrapper 실행")
             return loop.run_until_complete(get_activities_wrapper(_))
             
         def sync_get_monthly_summary(_):
             try:
+                logger.info("sync_get_monthly_summary 시작")
                 loop = asyncio.get_event_loop()
             except RuntimeError:
+                logger.info("새로운 이벤트 루프 생성")
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
+            logger.info("get_monthly_summary_wrapper 실행")
             return loop.run_until_complete(get_monthly_summary_wrapper(_))
         
-        return [
+        logger.info("도구 생성 시작")
+        tools = [
             Tool(
                 name="GetRunningActivities",
                 func=sync_get_activities,
@@ -124,28 +134,20 @@ class AIProvider:
                 description="러닝 활동 월간 통계를 조회합니다. 월별 거리, 소요시간, 평균 페이스를 조회합니다."
             )
         ]
+        logger.info("도구 생성 완료")
+        return tools
 
     def _create_ativity_coaching_agent(self, tools: list[Tool]):
         """에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터, 랩 데이터, 코멘트를 종합적으로 분석하여 맞춤형 피드백을 제공합니다.
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 간단하고 명확하게 분석하여 핵심적인 피드백을 제공합니다.
             오늘 날짜는 {today}입니다.
 
-            분석해야 할 데이터:
-            1. 활동 데이터: {input}
-            2. 랩 데이터: {laps}
-            3. 사용자 코멘트: {comments}
-
-            사용 가능한 도구들: {tool_names}
-
-            사용 가능한 도구들의 설명:
-            {tools}
-            
             다음 형식으로 단계별로 진행하세요:
             
             Thought: 현재 단계에서 해야 할 일을 설명
             
-            Action: 사용할 도구 이름
+            Action: 사용할 도구 이름 (반드시 제공된 도구 중 하나를 선택)
             
             Action Input: {{}}  # 도구에 파라미터가 필요 없는 경우 빈 중괄호 사용
             
@@ -155,58 +157,21 @@ class AIProvider:
             
             Final Answer: 최종 답변 (모든 데이터 수집 후에만 작성)
             
+            사용 가능한 도구들: {tool_names}
+
+            사용 가능한 도구들의 설명:
+            {tools}
+            
             {agent_scratchpad}
             
             중요 규칙:
             1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
             2. Action Input은 반드시 {{}} 형식으로 작성하세요.
             3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요.
-            4. Final Answer는 다음 형식으로 작성하세요:
-               a. 활동 개요
-                  - 거리, 시간, 페이스 등 기본 정보 요약
-                  - 심박수, 케이던스 등 생체 데이터 분석
-                  - 랩별 주요 지표 변화 추이
-               
-               b. 랩 분석
-                  - 각 랩의 페이스 변화와 의미
-                  - 심박수 구간별 분포와 훈련 강도
-                  - 케이던스와 보폭의 변화
-                  - 특이사항이 있는 랩의 상세 분석
-               
-               c. 활동 평가
-                  - 목표 대비 성과 분석
-                  - 코멘트에 언급된 특이사항 고려
-                  - 개선된 점과 부족한 점
-                  - 랩 데이터를 통한 훈련 효과 평가
-               
-               d. 맞춤형 조언
-                  - 현재 활동 수준에 맞는 구체적인 개선 방안
-                  - 코멘트에 언급된 문제점에 대한 해결책
-                  - 랩별 페이스 조절 전략
-                  - 다음 활동을 위한 준비사항
-               
-               e. 주의사항 및 팁
-                  - 부상 예방을 위한 주의사항
-                  - 훈련 효과를 높이기 위한 팁
-                  - 영양 및 회복 관련 조언
-                  - 랩 훈련 시 주의할 점
-
-            5. 분석 시 다음 사항을 반드시 고려하세요:
-               - 사용자의 코멘트에 언급된 특이사항
-               - 랩별 페이스 변화와 그 의미
-               - 심박수 구간별 분포와 의미
-               - 케이던스와 보폭의 관계
-               - 훈련 강도와 회복 필요성
-               - 랩 간 휴식 시간의 적절성
-               - 전체적인 훈련 패턴과 목표 달성도
-               
-            6. 답변 작성 시 다음 원칙을 지키세요:
-               - 구체적이고 실행 가능한 조언 제공
-               - 사용자의 현재 수준에 맞는 난이도로 설명
-               - 긍정적인 피드백과 개선점을 균형있게 제시
-               - 전문 용어는 쉽게 설명하여 사용
-               - 랩 데이터를 통한 객관적인 분석 제공
-               - 개인적인 코멘트와 데이터를 연계한 맞춤형 조언
+            4. Final Answer는 다음 형식으로 간단하게 작성하세요 (500자 이내):
+               - 핵심 성과: 가장 눈에 띄는 성과나 개선점
+               - 주요 피드백: 가장 중요한 1-2가지 개선 제안
+               - 다음 활동을 위한 팁: 즉시 적용할 수 있는 구체적인 조언
             """
         )
         
@@ -222,98 +187,135 @@ class AIProvider:
         race_name: str,
         race_date: str,
         race_type: str,
-        race_time: str
+        race_time: str,
+        special_notes: str
     ) -> Dict[str, Any]:
         """대회 훈련 일정 생성"""
-        try:
-            # 에이전트 생성 및 실행
-            tools = await self._create_tools(user_id)
-            agent = self._create_race_training_agent(tools)
-            executor = self._create_executor(agent, tools)
-            
-            response = await executor.ainvoke({
-                "today": datetime.now().strftime("%Y-%m-%d"),
-                "race_name": race_name,
-                "race_date": race_date,
-                "race_type": race_type,
-                "race_time": race_time
-            })
-            
-            return {
-                "training_schedule": response.get("output", ""),
-                "metadata": {
-                    "model": self.model_name,
-                    "user_id": user_id
+        max_retries = 3
+        retry_delay = 2  # 초 단위
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"훈련 일정 생성 시도 {attempt + 1}/{max_retries}")
+                
+                # 에이전트 생성 및 실행
+                tools = await self._create_tools(user_id)
+                logger.info("도구 생성 완료")
+                
+                agent = self._create_race_training_agent(tools)
+                logger.info("에이전트 생성 완료")
+                
+                executor = self._create_executor(agent, tools)
+                logger.info("실행기 생성 완료")
+                
+                logger.info("에이전트 실행 시작")
+                response = await executor.ainvoke({
+                    "today": datetime.now().strftime("%Y-%m-%d"),
+                    "race_name": race_name,
+                    "race_date": race_date,
+                    "race_type": race_type,
+                    "race_time": race_time,
+                    "special_notes": special_notes
+                })
+                logger.info("에이전트 실행 완료")
+                
+                return {
+                    "training_schedule": response.get("output", ""),
+                    "metadata": {
+                        "model": self.model_name,
+                        "user_id": user_id
+                    }
                 }
-            }
-        except Exception as e:
-            logger.error(f"훈련 일정 생성 실패: {str(e)}")
-            raise
+            except Exception as e:
+                error_message = str(e)
+                logger.error(f"훈련 일정 생성 시도 {attempt + 1} 실패: {error_message}")
+                
+                if "429" in error_message and attempt < max_retries - 1:
+                    logger.info(f"{retry_delay}초 후 재시도...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # 지수 백오프
+                    continue
+                else:
+                    raise Exception(f"훈련 일정 생성 실패 (시도 {attempt + 1}/{max_retries}): {error_message}")
 
     #대회 날짜를 보고 훈련 일정을 짜주는 에이전트
     def _create_race_training_agent(self, tools: list[Tool]):
         """에이전트 생성"""
+        logger.info("훈련 일정 에이전트 생성 시작")
         prompt = PromptTemplate.from_template(
             """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '대회 일정'일 까지 맞는 훈련 일정을 제공해준다.
             오늘 날짜는 {today}입니다. 대회명은 {race_name}입니다. 대회 날짜는 {race_date}입니다.
             {race_type} 대회의 목표 시간은 {race_time}입니다.
-            조회한 데이터들의 심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 훈련 일정을 작성해주세요.
+
+            다음 형식으로 단계별로 진행하세요:
+            
+            Thought: 현재 단계에서 해야 할 일을 설명
+            
+            Action: 사용할 도구 이름 (반드시 제공된 도구 중 하나를 선택)
+            
+            Action Input: {{}}  # 도구에 파라미터가 필요 없는 경우 빈 중괄호 사용
+            
+            Observation: 도구의 실행 결과 (JSON 문자열)
+            
+            Thought: 결과를 분석하고 다음 단계 결정
+            
+            Final Answer: 최종 답변 (모든 데이터 수집 후에만 작성)
             
             사용 가능한 도구들: {tool_names}
 
             사용 가능한 도구들의 설명:
             {tools}
+
+            특이사항: {special_notes}
             
             {agent_scratchpad}
             
-            1. 훈련 일정 작성 시 다음 사항을 고려하세요:
-               - 현재 러닝 능력과 대회까지 남은 기간
-               - 주간 훈련 거리와 강도의 점진적 증가
-               - 적절한 휴식과 회복 시간 배분
-               - 장거리 달리기와 단거리 인터벌의 균형
-               - 대회 테이퍼링 기간 설정
-               - 코어/근력 훈련 일정 포함
-               - 부상 예방을 위한 스트레칭과 회복 운동
-            
-            2. 일정은 다음 JSON 형식으로 작성하세요:
+            중요 규칙:
+            1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
+            2. Action Input은 반드시 {{}} 형식으로 작성하세요.
+            3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요.
+            4. Final Answer는 다음 JSON 형식으로 작성하세요:
             {{
-                "training_schedule": {{
-                    "start_date": "YYYY-MM-DD",
-                    "race_date": "YYYY-MM-DD",
-                    "race_name": "대회명",
-                    "target_pace": "MM:SS/km",
-                    "weekly_plans": [
-                        {{
-                            "week": 1,
-                            "total_distance": "주간 목표 거리(km)",
-                            "main_focus": "이번 주 중점 사항",
-                            "daily_schedule": [
-                                {{
-                                    "date": "YYYY-MM-DD",
-                                    "distance": "거리(km)",
-                                    "target_pace": "목표 페이스(MM:SS/km)",
-                                    "details": "상세 훈련 내용",
-                                    "additional_training": ["스트레칭", "코어운동" 등]
-                                }}
-                            ],
-                            "key_points": [
-                                "주요 훈련 포인트1",
-                                "주요 훈련 포인트2"
-                            ]
-                        }}
-                    ],
-                    "key_points": [
-                        "주요 훈련 포인트1",
-                        "주요 훈련 포인트2"
-                    ],
-                    "precautions": [
-                        "주의사항1",
-                        "주의사항2"
-                    ]
-                }}
+                "schedules": [
+                    {{
+                        "id": 1,
+                        "title": "기초 체력 훈련",
+                        "datetime": "2025-06-01T08:00:00",
+                        "description": "30분 러닝 + 스트레칭",
+                        "type": "훈련"
+                    }},
+                    {{
+                        "id": 2,
+                        "title": "대회 훈련",
+                        "datetime": "2025-06-05T08:00:00",
+                        "description": "대회 페이스로 8키로 훈련",
+                        "type": "대회"
+                    }},
+                    {{
+                        "id": 3,
+                        "title": "LSD 훈련",
+                        "datetime": "2025-06-10T08:00:00",
+                        "description": "18키로 장거리 훈련",
+                        "type": "훈련"
+                    }},
+                    {{
+                        "id": 4,
+                        "title": "인터벌 훈련",
+                        "datetime": "2025-06-14T08:00:00",
+                        "description": "400m x 10세트 인터벌 훈련",
+                        "type": "기타"
+                    }},
+                    {{
+                        "id": 5,
+                        "title": "서울 마라톤",
+                        "datetime": "2025-06-15T08:00:00",
+                        "description": "2024 서울 마라톤 하프 대회",
+                        "type": "대회"
+                    }}
+                ]
             }}
             
-            3. 일정 작성 시 다음 원칙을 지키세요:
+            5. 일정 작성 시 다음 원칙을 지키세요:
                - 구체적이고 실행 가능한 일정 제시
                - 사용자의 현재 수준에 맞는 난이도 설정
                - 점진적 부하 증가 원칙 준수
@@ -323,6 +325,7 @@ class AIProvider:
             """
         )
         
+        logger.info("에이전트 생성 완료")
         return create_react_agent(
             llm=self.llm,
             tools=tools,
@@ -392,7 +395,7 @@ class AIProvider:
             verbose=True,
             return_intermediate_steps=True,
             handle_parsing_errors=True,
-            max_iterations=20,  # 최대 반복 횟수를 2로 제한
-            max_execution_time=600,
-            early_stopping_method="generate"  # 조기 종료 메서드 추가
+            max_iterations=10,  # 최대 반복 횟수 감소
+            max_execution_time=300,  # 실행 시간 제한 감소
+            early_stopping_method="force"
         ) 

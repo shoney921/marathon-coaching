@@ -21,6 +21,8 @@ if 'user' not in st.session_state:
     st.session_state.user = None
 if 'token' not in st.session_state:
     st.session_state.token = None
+if 'calendar_key' not in st.session_state:
+    st.session_state.calendar_key = 0
 
 # 로그인 체크
 if not st.session_state.user:
@@ -149,52 +151,17 @@ def format_duration(duration_str):
         return duration_str
 
 def get_schedules():
-    mock_schedules = [
-        {
-            "id": 1,
-            "title": "기초 체력 훈련2",
-            "datetime": datetime.now().replace(hour=9, minute=0).isoformat(),
-            "description": "30분 러닝 + 스트레칭",
-            "type": "훈련"
-        },
-        {
-            "id": 2,
-            "title": "서울 마라톤",
-            "datetime": (datetime.now() + timedelta(days=7)).replace(hour=8, minute=0).isoformat(),
-            "description": "2024 서울 마라톤 대회",
-            "type": "대회"
-        },
-        {
-            "id": 3,
-            "title": "휴식일",
-            "datetime": (datetime.now() + timedelta(days=2)).replace(hour=0, minute=0).isoformat(),
-            "description": "완전 휴식",
-            "type": "휴식"
-        },
-        {
-            "id": 4,
-            "title": "영양사 상담",
-            "datetime": (datetime.now() + timedelta(days=3)).replace(hour=14, minute=30).isoformat(),
-            "description": "마라톤 대비 영양 상담",
-            "type": "기타"
-        },
-        {
-            "id": 5,
-            "title": "인터벌 훈련",
-            "datetime": (datetime.now() + timedelta(days=1)).replace(hour=18, minute=0).isoformat(),
-            "description": "400m x 10세트 인터벌 훈련",
-            "type": "훈련"
-        }
-    ]
     try:
         response = requests.get(
-            f"{API_BASE_URL}/schedules/user/{st.session_state.user['id']}",
+            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}",
             headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
             return response.json()
         else:
-            return mock_schedules
+            st.error(f"응답 처리 오류: {response.status_code}")
+            return []
+        
     except requests.exceptions.RequestException as e:
         st.error(f"API 연결 오류: {str(e)}")
     return []
@@ -544,8 +511,6 @@ with tab5:
 with tab6:
     st.title("📅 일정 관리")
 
-
-    
     # 일정 추가 폼
     with st.expander("➕ 새로운 일정 추가하기"):
         with st.form(key="schedule_form"):
@@ -585,30 +550,42 @@ with tab6:
                     except Exception as e:
                         st.error(f"일정 추가 중 오류가 발생했습니다: {str(e)}")
     
-    # 달력 뷰와 리스트 뷰를 탭으로 구분
-    calendar_tab, list_tab, agent_tab = st.tabs(["📅 달력 보기", "📋 목록 보기", "🤖일정 에이전트"])
-    
     # 실제 일정 데이터 가져오기
     schedules = get_schedules()
     
+    # 달력 뷰와 리스트 뷰를 탭으로 구분
+    calendar_tab, list_tab, agent_tab = st.tabs(["📅 달력 보기", "📋 목록 보기", "🤖일정 에이전트"])
+    
     # 달력 뷰
     with calendar_tab:
-        # 일정 데이터를 달력 형식으로 변환
-        calendar_events = []
-        for schedule in schedules:
-            event_datetime = datetime.fromisoformat(schedule['datetime'])
-            calendar_events.append({
-                "title": schedule['title'],
-                "start": event_datetime.strftime("%Y-%m-%dT%H:%M:%S"),
-                "end": (event_datetime + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S"),
-                "backgroundColor": color_mapping.get(schedule['type'], "#9C27B0"),
-                "borderColor": color_mapping.get(schedule['type'], "#9C27B0"),
-                "textColor": "#ffffff",
-                "description": schedule['description'],
-                "id": str(schedule['id'])
-            })
+        st.markdown("### 훈련 일정 캘린더")
         
-        # 달력 표시
+        # 캘린더 리렌더링 버튼
+        if st.button("🔄 캘린더 새로고침"):
+            st.session_state.calendar_key += 1
+            st.rerun()
+        
+        # 캘린더 이벤트 데이터 준비
+        calendar_events = []
+        if schedules:
+            for schedule in schedules:
+                try:
+                    event_datetime = datetime.fromisoformat(schedule['datetime'])
+                    calendar_events.append({
+                        "title": schedule['title'],
+                        "start": event_datetime.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "end": (event_datetime + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S"),
+                        "backgroundColor": color_mapping.get(schedule['type'], "#9C27B0"),
+                        "borderColor": color_mapping.get(schedule['type'], "#9C27B0"),
+                        "textColor": "#ffffff",
+                        "description": schedule['description'],
+                        "id": str(schedule['id'])
+                    })
+                except Exception as e:
+                    st.error(f"일정 데이터 변환 중 오류 발생: {str(e)}")
+                    continue
+        
+        # 달력 옵션 설정
         calendar_options = {
             "headerToolbar": {
                 "left": "prev,next today",
@@ -629,15 +606,53 @@ with tab6:
             "slotMaxTime": "24:00:00"
         }
         
-        calendar_result = calendar(
-            events=calendar_events,
-            options=calendar_options,
-            key="calendar"
-        )
-        
-        # 달력 이벤트 처리
-        if calendar_result:
-            st.write("선택된 일정:", calendar_result)
+        # 캘린더가 비어있을 때 메시지 표시
+        if not calendar_events:
+            st.info("표시할 일정이 없습니다. 새로운 일정을 생성해보세요!")
+        else:
+            # 세션 상태의 key를 사용하여 캘린더 렌더링
+            calendar_result = calendar(
+                events=calendar_events,
+                options=calendar_options,
+                key=f"calendar_{st.session_state.calendar_key}"
+            )
+            
+            # 달력 이벤트 처리
+            if calendar_result:
+                # 선택된 일정 정보를 깔끔하게 표시
+                with st.container():
+                    st.markdown("""
+                        <style>
+                        .selected-event {
+                            background-color: #f0f7ff;
+                            padding: 15px;
+                            border-radius: 8px;
+                            border-left: 4px solid #1976D2;
+                            margin: 10px 0;
+                        }
+                        </style>
+                        <div class="selected-event">
+                            <h4>📅 선택된 일정 정보</h4>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if isinstance(calendar_result, dict) and 'eventClick' in calendar_result:
+                        event = calendar_result['eventClick']['event']
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**제목:**", event.get('title', '정보 없음'))
+                            # 시작 시간 포맷팅 (한국 시간대 고려)
+                            start_time = event.get('start', '').replace('+09:00', '')
+                            st.write("**시작 시간:**", start_time.replace('T', ' '))
+                        with col2:
+                            # 종료 시간 포맷팅 (한국 시간대 고려)
+                            end_time = event.get('end', '').replace('+09:00', '')
+                            st.write("**종료 시간:**", end_time.replace('T', ' '))
+                            st.write("**설명:**", event.get('extendedProps', {}).get('description', '정보 없음'))
+                    else:
+                        st.info("일정을 선택하면 상세 정보가 표시됩니다.")
+                
+                # st.write("선택된 일정:", calendar_result)
     
     # 리스트 뷰
     with list_tab:
@@ -673,6 +688,11 @@ with tab6:
                     options=["풀 마라톤(42.195km)", "하프 마라톤(21.0975km)", "10K", "5K"],
                     format_func=lambda x: x.split("(")[0] if "(" in x else x
                 )
+                race_date = st.date_input(
+                    "대회 날짜",
+                    min_value=datetime.now().date(),
+                    help="대회 날짜를 선택해주세요"
+                )
             
             with col2:
                 time_col1, time_col2, time_col3 = st.columns(3)
@@ -684,6 +704,18 @@ with tab6:
                     seconds = st.number_input("초", min_value=0, max_value=59, value=0)
                 
                 target_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+                race_date = race_date.strftime("%Y-%m-%d")
+
+            # 특이사항 입력 필드 추가
+            st.write("---")
+            st.subheader("💭 특이사항 및 요청사항")
+            special_notes = st.text_area(
+                "특이사항이나 요청사항을 입력해주세요",
+                placeholder="예: 부상 이력, 훈련 선호도, 특별히 고려해야 할 사항 등",
+                help="훈련 일정 생성 시 고려해야 할 특이사항이나 요청사항을 자유롭게 입력해주세요",
+                height=100
+            )
             
             submit_button = st.form_submit_button("목표 설정")
             
@@ -697,15 +729,15 @@ with tab6:
                     - 목표 시간: {target_time}""")
                     try:
                         response = requests.post(
-                            f"{API_BASE_URL}/activities/race-training/{st.session_state.user['id']}",
+                            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}",
                             headers={"Authorization": f"Bearer {st.session_state.token}"},
-                            json={"race_name": "서울 마라톤", "race_date": "2024-10-12", "race_type": "마라톤", "race_time": "04:00:00"}
+                            json={"race_name": race_name, "race_date": race_date, "race_type": race_type, "race_time": target_time, "special_notes": special_notes}
                         )
                         
                         if response.status_code == 200:
                             schedule_data = response.json()
                             st.success("훈련 일정 생성 완료")
-                            st.json(schedule_data)  # JSON 형식으로 보기 좋게 표시
+                            st.rerun()
                         else:
                             error_detail = response.json().get('detail', '알 수 없는 오류가 발생했습니다.')
                             st.error(f"훈련 일정 생성 실패: {error_detail}")

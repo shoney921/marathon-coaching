@@ -324,8 +324,8 @@ async def request_activity_feedback(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/activities/race-training/{user_id}")
-async def request_race_training(
+@app.post("/activities/training-schedule/{user_id}")
+async def create_training_schedule(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db)
@@ -337,6 +337,7 @@ async def request_race_training(
         race_date = body.get("race_date")
         race_type = body.get("race_type")
         race_time = body.get("race_time")
+        special_notes = body.get("special_notes")
 
         schedule_service = ScheduleService(db)
         schedule = await schedule_service.create_race_training_schedule(
@@ -344,14 +345,18 @@ async def request_race_training(
             race_name=race_name,
             race_date=race_date,
             race_type=race_type,
-            race_time=race_time
+            race_time=race_time,
+            special_notes=special_notes
         )
         return schedule
     except Exception as e:
         logger.error(f"훈련 일정 생성 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-
+@app.get("/activities/training-schedule/{user_id}")
+async def get_training_schedule(user_id: int, db: Session = Depends(get_db)):
+    schedule_service = ScheduleService(db)
+    return schedule_service.get_user_schedules(user_id)
 
 ## 유틸 함수
 #region 유틸

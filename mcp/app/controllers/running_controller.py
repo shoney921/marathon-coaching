@@ -82,6 +82,7 @@ class RunningController:
             race_date = request.parameters.get("race_date")
             race_type = request.parameters.get("race_type")
             race_time = request.parameters.get("race_time")
+            special_notes = request.parameters.get("special_notes")
             
             if not user_id or not race_name or not race_date or not race_type or not race_time:
                 raise MCPError("All parameters are required", "MISSING_PARAMETER")
@@ -91,7 +92,8 @@ class RunningController:
                 race_name=race_name,
                 race_date=race_date,
                 race_type=race_type,
-                race_time=race_time
+                race_time=race_time,
+                special_notes=special_notes
             )
             return MCPResponse(
                 status="success",
