@@ -23,6 +23,8 @@ class RunningController:
                 return await self._handle_analyze_activity(request)
             elif request.action == "create_race_training":
                 return await self._handle_create_race_training(request)
+            elif request.action == "running_coach_prompt":
+                return await self._handle_running_coach_prompt(request)
             else:
                 raise MCPError(f"Unknown action: {request.action}", "INVALID_ACTION")
         except MCPError as e:
@@ -106,3 +108,29 @@ class RunningController:
                 error=str(e),
                 data=None
             ) 
+        
+    async def _handle_running_coach_prompt(self, request: MCPRequest) -> MCPResponse:
+        try:
+            user_id = request.parameters.get("user_id")
+            user_message = request.parameters.get("user_message")
+            chat_history = request.parameters.get("chat_history")
+            activities = request.parameters.get("activities")
+            training_schedule = request.parameters.get("training_schedule")
+            
+            if not user_id or not user_message:
+                raise MCPError("user_id and user_message are required", "MISSING_PARAMETER")
+            
+            response = await self.ai_provider.generate_running_coach_response(
+                user_id=user_id,
+                user_message=user_message,
+                chat_history=chat_history,
+                activities=activities,
+                training_schedule=training_schedule
+            )
+            return MCPResponse(
+                status="success",
+                data={"response": response}
+            )
+        except Exception as e:
+            logger.error(f"Running coach prompt generation failed: {str(e)}")
+            

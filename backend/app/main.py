@@ -367,6 +367,67 @@ async def delete_training_schedule(user_id: int, schedule_id: int, db: Session =
     schedule_service = ScheduleService(db)
     return schedule_service.delete_schedule(schedule_id, user_id)
 
+@app.post("/running-coach/prompt")
+async def running_coach_prompt(request: Request, db: Session = Depends(get_db)):
+    body = await request.json()
+    user_message = body.get("user_message")
+    chat_history = body.get("chat_history")
+    user_id = body.get("user_id")
+    activities = body.get("activities")
+    training_schedule = body.get("training_schedule")
+    
+    # 활동 데이터 전처리
+    activities = [
+        {
+            "activity_id": activity["id"],
+            "distance": activity["distance"],
+            "duration": activity["duration"],
+            "pace": speed_to_pace(activity["speed"]),
+            "speed": activity["speed"],
+            "heart_rate": activity["heart_rate"],
+            "calories": activity["calories"],
+            "elevation": activity["elevation"],
+            "notes": activity["notes"]
+        }
+        for activity in activities
+    ]
+    
+    # 훈련 일정 전처리
+    training_schedule = [
+        {
+            "schedule_id": schedule["id"],
+            "race_name": schedule["race_name"],
+            "race_date": schedule["race_date"],
+            "race_type": schedule["race_type"],
+            "race_time": schedule["race_time"],
+            "special_notes": schedule["special_notes"]
+        }
+        for schedule in training_schedule
+    ]
+    
+    # MCP 서버에 요청
+    mcp_url = os.getenv("MCP_URL", "http://localhost:8000")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{mcp_url}/mcp",
+            json={
+                "action": "analyze_activity",
+                "parameters": {
+                    "user_id": user_id,
+                    "query": user_message,
+                    "chat_history": chat_history,
+                    "activities": activities,
+                    "training_schedule": training_schedule
+                }
+            }
+        ) as response:
+            if response.status == 200:
+                mcp_response = await response.json()
+                return mcp_response["message"]
+            else:
+                return "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."  
+        
+
 ## 유틸 함수
 #region 유틸
 def format_duration(seconds: float) -> str:

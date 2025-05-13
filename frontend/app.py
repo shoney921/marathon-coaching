@@ -182,7 +182,7 @@ def delete_schedule(schedule_id):
         return None
 
 # 탭 생성
-tab1, tab5, tab6 = st.tabs(["홈", "활동 기록", "일정 관리"])
+tab1, tab5, tab6, tab7 = st.tabs(["🏠 홈", "📊 활동 기록", "📅 일정 관리", "🤖 러닝 코치"])
 
 # 홈 페이지
 with tab1:
@@ -750,4 +750,140 @@ with tab6:
                         st.error(f"응답 처리 오류: {str(e)}")
 
                 
+    
+
+# 러닝 코치 페이지
+with tab7:
+    st.title("🤖 러닝 코치")
+    st.write("러닝에 관한 질문을 자유롭게 해보세요!")
+
+    # 대화 기록을 저장할 세션 상태 초기화
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+
+    # 채팅 인터페이스 스타일
+    st.markdown("""
+        <style>
+        .chat-message {
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .assistant-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .message-header img {
+            width: 24px;
+            height: 24px;
+            margin-right: 0.5rem;
+        }
+        .message-content {
+            line-height: 1.5;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 채팅 기록 표시
+    for message in st.session_state.chat_history:
+        if message["role"] == "user":
+            st.markdown(f"""
+                <div class="chat-message user-message">
+                    <div class="message-header">
+                        <img src="https://img.icons8.com/color/48/000000/user.png" alt="User"/>
+                        <div style="font-weight: bold;">나</div>
+                    </div>
+                    <div class="message-content">{message["content"]}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div class="chat-message assistant-message">
+                    <div class="message-header">
+                        <img src="https://img.icons8.com/color/48/000000/coach.png" alt="Coach"/>
+                        <div style="font-weight: bold;">러닝 코치</div>
+                    </div>
+                    <div class="message-content">{message["content"]}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # 사용자 입력
+    user_input = st.text_area(
+        "질문을 입력하세요",
+        placeholder="예: 초보자가 시작할 때 적절한 페이스는 어떻게 되나요?",
+        height=100
+    )
+
+    col1, col2 = st.columns([0.8, 0.2])
+    with col1:
+        if st.button("질문하기", use_container_width=True):
+            if user_input:
+                # 사용자 메시지 추가
+                st.session_state.chat_history.append({"role": "user", "content": user_input})
+                
+                # 로딩 표시
+                with st.spinner("러닝 코치가 답변을 준비중입니다..."):
+                    # API 요청 데이터 준비
+                    request_data = {
+                        "user_message": user_input,
+                        "chat_history": st.session_state.chat_history,
+                        "user_id": st.session_state.user_id,  # 사용자 ID
+                        "activities": st.session_state.activities,  # 사용자의 활동 데이터
+                        "training_schedule": st.session_state.training_schedule  # 훈련 일정
+                    }
+                    
+                    # API 호출
+                    response = requests.post(
+                        f"{API_BASE_URL}/running-coach/prompt",
+                        json=request_data
+                    )
+                    
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        response = response_data["message"]
+                    else:
+                        response = "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."
+                    
+                    
+                    # 어시스턴트 메시지 추가
+                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                
+                # 화면 새로고침
+                st.rerun()
+            else:
+                st.warning("질문을 입력해주세요.")
+    
+    with col2:
+        if st.button("대화 초기화", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
+
+    # 도움말 섹션
+    with st.expander("💡 도움말"):
+        st.markdown("""
+        ### 질문 예시
+        - 초보자가 시작할 때 적절한 페이스는 어떻게 되나요?
+        - 러닝 중 호흡법은 어떻게 해야 하나요?
+        - 장거리 러닝을 위한 영양 섭취 방법은?
+        - 러닝 중 발생하는 통증을 예방하는 방법은?
+        - 목표 시간을 달성하기 위한 훈련 계획은 어떻게 세워야 하나요?
+        
+        ### 팁
+        - 구체적인 질문을 하면 더 정확한 답변을 받을 수 있습니다.
+        - 현재 러닝 수준과 목표를 함께 언급하면 더 맞춤형 조언을 받을 수 있습니다.
+        - 부상이나 건강 상태에 대한 질문은 전문의와 상담하시기 바랍니다.
+        """)
+
+    
     

@@ -310,52 +310,83 @@ class AIProvider:
             prompt=prompt
         )
 
+    async def generate_running_coach_response(
+        self,
+        user_id: int,
+        user_message: str,
+        chat_history: list[dict],
+        activities: list[dict],
+        training_schedule: list[dict]
+    ) -> Dict[str, Any]:
+        """러닝 코치 응답 생성"""
+        try:
+            # 에이전트 생성 및 실행
+            tools = await self._create_tools(user_id)
+            agent = self._create_generate_running_coach_agent(tools)
+            executor = self._create_executor(agent, tools)
+            
+            response = await executor.ainvoke({
+                "today": datetime.now().strftime("%Y-%m-%d"),
+                "input": user_message,
+                "chat_history": chat_history,
+                "activities": activities,
+                "training_schedule": training_schedule
+            })
+            
+            return {
+                "response": response.get("output", ""),
+                "metadata": {
+                    "model": self.model_name,
+                    "user_id": user_id
+                }
+            }
+        except Exception as e:
+            logger.error(f"러닝 코치 응답 생성 실패: {str(e)}")
+            raise
 
-    def _create_ativity_praise_agent(self, tools: list[Tool]):
-        """에이전트 생성"""
+    def _create_generate_running_coach_agent(self, tools: list[Tool]):
+        """러닝 코치 응답 생성 에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하여 '질문'에 대한 전문적인 조언을 제공합니다.
-            오늘 날짜는 {today}입니다. 조회한 데이터들의 시간 순서들도 잘 고려해서 질문의 답변을 해주세요. 
-            심박수, 파워, 케이던스, 속도, 거리, 시간 등 모든 데이터를 참고하여 질문에 대한 답변을 해주세요.
-            
-            사용 가능한 도구들: {tool_names}
+            """당신은 친근하고 전문적인 러닝 코치입니다. 사용자와 자연스러운 대화를 통해 러닝에 대한 조언을 제공합니다.
+            오늘 날짜: {today}
 
-            사용 가능한 도구들의 설명:
-            {tools}
+            사용자 컨텍스트:
+            - 활동 이력: {activities}
+            - 훈련 계획: {training_schedule}
+            - 이전 대화: {chat_history}
+
+            사용 가능한 도구들: {tool_names}
+            도구 설명: {tools}
             
-            질문 : {input}
+            현재 질문: {input}
             
-            다음 형식으로 단계별로 진행하세요:
-            
-            Thought: 현재 단계에서 해야 할 일을 설명
-            
-            Action: 사용할 도구 이름
-            
-            Action Input: {{}}  # 도구에 파라미터가 필요 없는 경우 빈 중괄호 사용
-            
-            Observation: 도구의 실행 결과 (JSON 문자열)
-            
-            Thought: 결과를 분석하고 다음 단계 결정
-            
-            Final Answer: 최종 답변 (모든 데이터 수집 후에만 작성)
+            대화 진행 방식:
+            1. Thought: 현재 상황 분석
+            2. Action: 필요한 도구 선택
+            3. Action Input: {{}}
+            4. Observation: 도구 결과
+            5. Thought: 결과 분석
+            6. Final Answer: 친근한 답변
             
             {agent_scratchpad}
             
-            중요 규칙:
-            1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
-            2. Action Input은 반드시 {{}} 형식으로 작성하세요. 파라미터가 필요 없는 도구의 경우에도 빈 중괄호를 사용해야 합니다.
-            3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요. 수정하지 마세요.
-            4. Final Answer는 모든 데이터 수집 후에만 작성하세요.
-            5. 각 단계는 위 순서를 정확히 따라야 합니다.
-            6. Action은 반드시 제공된 도구 중 하나만 사용하세요.
-            7. Thought 다음에는 반드시 Action이 와야 합니다.
-            8. Observation 다음에는 반드시 Thought가 와야 합니다.
-            9. GetRunningActivities와 GetMonthlyActivitySummary 도구는 각각 한 번만 사용하세요.
-            10. 두 도구의 결과를 모두 수집했다면, 바로 Final Answer를 작성하세요.
-            11. Final Answer는 다음 형식으로 작성하세요:
-                - 활동에 대한 분석
-                - 활동에 대한 조언
-                - 활동에 대한 주의사항 및 팁
+            대화 규칙:
+            1. 친근하고 자연스러운 톤으로 대화하세요
+            2. 사용자의 활동 이력과 훈련 계획을 참고하여 맞춤형 조언을 제공하세요
+            3. 이전 대화 내용을 기억하고 연속성 있게 답변하세요
+            4. 구체적인 수치와 예시를 포함하되, 너무 전문적인 용어는 피하세요
+            5. 안전과 건강을 최우선으로 고려하세요
+            6. 답변은 200자 이내로 간단명료하게 작성하세요
+            7. 사용자의 수준에 맞는 조언을 제공하세요
+            8. 긍정적이고 격려하는 톤을 유지하세요
+            9. 필요할 때만 도구를 사용하고, 간단한 질문은 바로 답변하세요
+            10. 대화의 맥락을 유지하면서 자연스럽게 이어가세요
+
+            답변 예시:
+            "안녕하세요! 지난번 5km 러닝 기록을 보니 페이스가 많이 좋아졌네요. 
+            이번 주 훈련 계획에 따르면 내일은 8km 러닝이 예정되어 있는데, 
+            지난번보다 조금 더 여유로운 페이스로 시작해보는 건 어떨까요? 
+            워밍업을 충분히 하고, 첫 2km는 편안한 페이스로 시작하면 좋을 것 같아요."
             """
         )
         
