@@ -559,9 +559,7 @@ with tab6:
     # 달력 뷰
     with calendar_tab:
         st.markdown("### 훈련 일정 캘린더")
-        
-        # 캘린더 리렌더링 버튼
-        if st.button("🔄 캘린더 새로고침"):
+        if st.button("🔄"):
             st.session_state.calendar_key += 1
             st.rerun()
         
@@ -621,20 +619,7 @@ with tab6:
             if calendar_result:
                 # 선택된 일정 정보를 깔끔하게 표시
                 with st.container():
-                    st.markdown("""
-                        <style>
-                        .selected-event {
-                            background-color: #f0f7ff;
-                            padding: 15px;
-                            border-radius: 8px;
-                            border-left: 4px solid #1976D2;
-                            margin: 10px 0;
-                        }
-                        </style>
-                        <div class="selected-event">
-                            <h4>📅 선택된 일정 정보</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    st.subheader("📅 선택된 일정 정보")
                     
                     if isinstance(calendar_result, dict) and 'eventClick' in calendar_result:
                         event = calendar_result['eventClick']['event']
@@ -673,21 +658,16 @@ with tab6:
     # 일정 생성 에이전트
     with agent_tab:
         st.title("🤖 일정 에이전트")
-        st.write("일정 생성 에이전트는 현재 훈련 일정을 참고하여 새로운 일정을 생성합니다.")
+        st.write("나의 러닝 활동 데이터를 참조하여 새로운 훈련 일정을 생성합니다.")
         # 목표 대회 정보 입력 폼
         with st.form("race_target_form"):
             st.subheader("🎯 목표 대회 정보")
             
-            race_name = st.text_input("목표 대회명", placeholder="예: 서울 마라톤")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                race_type = st.selectbox(
-                    "대회 타입",
-                    options=["풀 마라톤(42.195km)", "하프 마라톤(21.0975km)", "10K", "5K"],
-                    format_func=lambda x: x.split("(")[0] if "(" in x else x
-                )
+                race_name = st.text_input("목표 대회명", placeholder="예: 서울 마라톤") 
                 race_date = st.date_input(
                     "대회 날짜",
                     min_value=datetime.now().date(),
@@ -695,6 +675,11 @@ with tab6:
                 )
             
             with col2:
+                race_type = st.selectbox(
+                    "대회 타입",
+                    options=["풀 마라톤(42.195km)", "하프 마라톤(21.0975km)", "10K", "5K"],
+                    format_func=lambda x: x.split("(")[0] if "(" in x else x
+                )
                 time_col1, time_col2, time_col3 = st.columns(3)
                 with time_col1:
                     hours = st.number_input("목표 시간", min_value=0, max_value=23, value=4)
@@ -717,7 +702,7 @@ with tab6:
                 height=100
             )
             
-            submit_button = st.form_submit_button("목표 설정")
+            submit_button = st.form_submit_button("대회 일정 생성")
             
             if submit_button:
                 if not race_name:

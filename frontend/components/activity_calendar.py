@@ -68,6 +68,9 @@ def create_activity_calendar(activities):
         .activity-level-2 { background-color: #40c463; }
         .activity-level-3 { background-color: #30a14e; }
         .activity-level-4 { background-color: #216e39; }
+        .activity-level-5 { background-color: #FF4500; }
+        .activity-level-6 { background-color: #B22222; }
+        .activity-level-7 { background-color: #8B0000; }
         .calendar-footer {
             display: flex;
             margin-top: 5px;
@@ -128,19 +131,45 @@ def create_activity_calendar(activities):
                 total_distance = sum(float(a['distance']) for a in activities)
                 
                 # 거리에 따른 활동 레벨 결정
-                if total_distance > 10:
+                if total_distance >= 42:  # 풀 마라톤
+                    level = 7
+                    color = "#8B0000"  # 진한 빨간색
+                elif total_distance >= 30:
+                    level = 6
+                    color = "#B22222"  # 벽돌색
+                elif total_distance >= 21:  # 하프 마라톤
+                    level = 5
+                    color = "#DC143C"  # 진한 빨간색
+                elif total_distance >= 15:
                     level = 4
-                elif total_distance > 7:
+                    color = "#FF4500"  # 주황빛 빨간색
+                elif total_distance >= 10:
                     level = 3
-                elif total_distance > 4:
+                    color = "#FF8C00"  # 진한 주황색
+                elif total_distance >= 5:
                     level = 2
+                    color = "#FFA500"  # 주황색
                 elif total_distance > 0:
                     level = 1
+                    color = "#32CD32"  # 라임 그린
                 else:
                     level = 0
-                    
+                    color = "#90EE90"  # 연한 초록색
+
+                # 레벨에 따른 설명 추가
+                level_descriptions = {
+                    7: "풀 마라톤 (42.195km)",
+                    6: "장거리 훈련 (30km+)",
+                    5: "하프 마라톤 (21.0975km)",
+                    4: "중장거리 훈련 (15km+)",
+                    3: "중거리 훈련 (10km+)",
+                    2: "단거리 훈련 (5km+)",
+                    1: "가벼운 운동",
+                    0: "휴식"
+                }
+                
                 tooltip = f"{date.strftime('%Y-%m-%d')}<br>총 거리: {total_distance:.1f}km"
-                day_html = f'<div class="calendar-day activity-level-{level}" title="{tooltip}">'
+                day_html = f'<div class="calendar-day activity-level-{level}" title="{tooltip}" style="background-color: {color};">'
                 if weekday_label:
                     day_html += f'<span class="weekday-label">{weekday_label}</span>'
                 if month_label:
@@ -161,4 +190,40 @@ def create_activity_calendar(activities):
     
     calendar_html += '</div></div>'
     
-    st.markdown(calendar_html, unsafe_allow_html=True) 
+    # 활동 레벨 설명 추가
+    calendar_html_description = """
+        <div class="calendar-legend" style="margin-top: 15px; padding: 10px; background-color: #f6f8fa; border-radius: 6px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #8B0000; border-radius: 3px;"></div>
+                    <span>풀 마라톤 (42km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #B22222; border-radius: 3px;"></div>
+                    <span>장거리 훈련 (30km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #DC143C; border-radius: 3px;"></div>
+                    <span>하프 마라톤 (21km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #FF4500; border-radius: 3px;"></div>
+                    <span>중장거리 훈련 (15km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #FF8C00; border-radius: 3px;"></div>
+                    <span>중거리 훈련 (10km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #FFA500; border-radius: 3px;"></div>
+                    <span>단거리 훈련 (5km+)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 15px; height: 15px; background-color: #32CD32; border-radius: 3px;"></div>
+                    <span>가벼운 운동</span>
+                </div>
+            </div>
+        </div>
+    """
+    st.markdown(calendar_html, unsafe_allow_html=True)
+    st.markdown(calendar_html_description, unsafe_allow_html=True)
