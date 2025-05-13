@@ -90,13 +90,13 @@ class GarminService:
                 try:
                     # 이미 저장된 활동인지 확인
                     existing_activity = self.db.query(Activity).filter(
+                        Activity.user_id == user_id,
                         Activity.activity_id == activity_data.get('activityId')
                     ).first()
                     
                     if existing_activity:
                         logger.info(f"Activity {activity_data.get('activityId')} already exists, skipping")
                         continue
-
                     
                     # 심박수 구간 시간
                     hr_zones = {

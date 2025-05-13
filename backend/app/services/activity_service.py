@@ -101,11 +101,12 @@ class ActivityService:
             "manual_activity": activity.manual_activity
         } for activity in activities]
 
-    def get_activity(self, activity_id: int):
+    def get_activity(self, user_id: int, activity_id: int):
         """
         특정 활동의 상세 정보를 조회합니다.
         
         Args:
+            user_id (int): 사용자 ID
             activity_id (int): 활동 ID
             
         Returns:
@@ -114,7 +115,7 @@ class ActivityService:
         Raises:
             HTTPException: 활동을 찾을 수 없는 경우 404 에러
         """
-        activity = self.db.query(Activity).filter(Activity.activity_id == activity_id).first()
+        activity = self.db.query(Activity).filter(Activity.user_id == user_id, Activity.activity_id == activity_id).first()
         if not activity:
             raise HTTPException(status_code=404, detail="Activity not found")
         return {
@@ -400,6 +401,18 @@ class ActivityService:
 
             for lap in splits_data['lapDTOs']:
                 try:
+                    # 이미 존재하는 lap 데이터인지 확인
+                    existing_split = self.db.query(ActivitySplit).filter(
+                        ActivitySplit.activity_id == activity_id,
+                        ActivitySplit.lap_index == lap.get('lapIndex')
+                    ).first()
+                    
+                    # 이미 존재하면 건너뛰기
+                    if existing_split:
+                        logger.info(f"Split {lap.get('lapIndex')} for activity {activity_id} already exists. Skipping...")
+                        continue
+
+                    # 존재하지 않으면 생성
                     split = ActivitySplit(
                         activity_id=activity_id,
                         lap_index=lap.get('lapIndex'),

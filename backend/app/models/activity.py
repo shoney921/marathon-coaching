@@ -7,7 +7,7 @@ class Activity(Base):
 
     # ─────────────────── 기본 정보 ───────────────────
     id = Column(Integer, primary_key=True, index=True)  # 내부 DB용 고유 ID
-    activity_id = Column(Integer, unique=True, index=True)  # 가민 활동 고유 ID
+    activity_id = Column(Integer, index=True)  # 가민 활동 고유 ID
     user_id = Column(Integer, index=True)  # 사용자 ID
     activity_name = Column(String)  # 활동 이름 (예: 서울하프마라톤 10k)
     start_time_local = Column(DateTime)  # 활동 시작 시간 (로컬 기준)

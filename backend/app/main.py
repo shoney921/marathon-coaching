@@ -212,10 +212,10 @@ async def get_activities(user_id: int, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)
     return activity_service.get_activities(user_id)
 
-@app.get("/activities/{activity_id}")
-async def get_activity(activity_id: int, db: Session = Depends(get_db)):
+@app.get("/activities/user/{user_id}/{activity_id}")
+async def get_activity(user_id: int, activity_id: int, db: Session = Depends(get_db)):
     activity_service = ActivityService(db)
-    return activity_service.get_activity(activity_id)
+    return activity_service.get_activity(user_id, activity_id)
 
 @app.get("/activities/laps/user/{user_id}")
 async def get_activities_laps_with_comments(user_id: int, db: Session = Depends(get_db)):
@@ -254,6 +254,7 @@ async def sync_garmin_activities(user_id: int, user_data: GarminSyncRequest, db:
 
 @app.post("/activities/feedback/{activity_id}")
 async def request_activity_feedback(
+    user_id: int,
     activity_id: int,
     request: Request,
     db: Session = Depends(get_db)
@@ -266,7 +267,7 @@ async def request_activity_feedback(
         
         # 1. 활동 데이터 조회
         activity_service = ActivityService(db)
-        activity = activity_service.get_activity(activity_id)
+        activity = activity_service.get_activity(user_id, activity_id)
         laps = activity_service.get_activity_laps(activity_id)
         
         if not activity:
@@ -296,7 +297,7 @@ async def request_activity_feedback(
 
                     # 3. 피드백 결과 저장
                     feedback_data = {
-                        "user_id": activity["user_id"],
+                        "user_id": user_id,
                         "activity_id": activity_id,
                         "feedback_data": mcp_response["data"]["analysis"]["analysis"],
                         "created_at": datetime.now()
