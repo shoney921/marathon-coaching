@@ -148,13 +148,13 @@ def create_activity_calendar(activities):
                     color = "#FF8C00"  # 진한 주황색
                 elif total_distance >= 5:
                     level = 2
-                    color = "#FFA500"  # 주황색
+                    color = "#32CD32"  # 라임 그린
                 elif total_distance > 0:
                     level = 1
-                    color = "#32CD32"  # 라임 그린
+                    color = "#C1FFC1"  # 매우 연한 초록색
                 else:
                     level = 0
-                    color = "#90EE90"  # 연한 초록색
+                    color = "#87CEEB"  # 하늘색
 
                 # 레벨에 따른 설명 추가
                 level_descriptions = {
@@ -215,11 +215,11 @@ def create_activity_calendar(activities):
                     <span>중거리 훈련 (10km+)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 15px; height: 15px; background-color: #FFA500; border-radius: 3px;"></div>
+                    <div style="width: 15px; height: 15px; background-color: #32CD32; border-radius: 3px;"></div>
                     <span>단거리 훈련 (5km+)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 15px; height: 15px; background-color: #32CD32; border-radius: 3px;"></div>
+                    <div style="width: 15px; height: 15px; background-color: #C1FFC1; border-radius: 3px;"></div>
                     <span>가벼운 운동</span>
                 </div>
             </div>
