@@ -51,6 +51,10 @@ class AIProvider:
             project=os.getenv("GCP_PROJECT_ID", "lge-vs-genai")
         )
 
+    """
+    1. analyze_activity
+    사용자가 선택한 특정 러닝 활동 데이터를 분석하여 맞춤형 피드백을 제공합니다.
+    """
     async def analyze_activity(self, user_id: int, query: str, comments: list[str], laps: list[dict]) -> Dict[str, Any]:
         """러닝 활동 분석"""
         try:
@@ -136,7 +140,10 @@ class AIProvider:
             prompt=prompt
         )
 
-
+    """
+    2. create_race_training
+    사용자의 러닝 활동 데이터를 분석하여 대회 일정까지 맞는 훈련 일정을 제공합니다.
+    """
     async def create_race_training(
         self,
         user_id: int,
@@ -266,27 +273,32 @@ class AIProvider:
             prompt=prompt
         )
 
-    async def generate_running_coach_response(
+    """
+    3. running_coach_prompt
+    사용자의 러닝 활동 데이터를 분석하여 러닝 코치 응답을 생성합니다.
+    """
+    async def running_coach_prompt(
         self,
         user_id: int,
         user_message: str,
         chat_history: list[dict],
-        activities: list[dict],
-        training_schedule: list[dict]
     ) -> Dict[str, Any]:
         """러닝 코치 응답 생성"""
         try:
             # 에이전트 생성 및 실행
-            tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
+            tools = self.tool_manager.create_tools(user_id, [
+                "GetRunningActivities", 
+                "GetMonthlyActivitySummary",
+                "GetSchedules",
+                "UpdateSchedule"
+            ])
             agent = self._create_generate_running_coach_agent(tools)
             executor = self._create_executor(agent, tools)
             
             response = await executor.ainvoke({
                 "today": datetime.now().strftime("%Y-%m-%d"),
                 "input": user_message,
-                "chat_history": chat_history,
-                "activities": activities,
-                "training_schedule": training_schedule
+                "chat_history": chat_history
             })
             
             return {
@@ -301,48 +313,102 @@ class AIProvider:
             raise
 
     def _create_generate_running_coach_agent(self, tools: list[Tool]):
-        """러닝 코치 응답 생성 에이전트 생성"""
+        """에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 친근하고 전문적인 러닝 코치입니다. 사용자와 자연스러운 대화를 통해 러닝에 대한 조언을 제공합니다.
-            오늘 날짜: {today}
+            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 분석하고 훈련 일정을 관리합니다.
+            오늘 날짜는 {today}입니다.
 
-            사용자 컨텍스트:
-            - 활동 이력: {activities}
-            - 훈련 계획: {training_schedule}
-            - 이전 대화: {chat_history}
+            사용자의 요청:
+            {input}
 
+            사용자와 이전 대화 내역:
+            {chat_history}
+            
+            다음 형식으로 단계별로 진행하세요. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요:
+            
+            Thought: 현재 단계에서 해야 할 일을 설명
+            
+            Action: 사용할 도구 이름 (반드시 제공된 도구 중 하나를 선택)
+            
+            Action Input: {{}}  # 도구에 파라미터가 필요 없는 경우 빈 중괄호 사용
+            
+            Observation: 도구의 실행 결과 (JSON 문자열)
+            
+            Thought: 결과를 분석하고 다음 단계 결정
+            
+            Final Answer: 최종 답변 (모든 데이터 수집 후에만 작성)
+            
             사용 가능한 도구들: {tool_names}
-            도구 설명: {tools}
-            
-            현재 질문: {input}
-            
-            대화 진행 방식:
-            1. Thought: 현재 상황 분석
-            2. Action: 필요한 도구 선택
-            3. Action Input: {{}}
-            4. Observation: 도구 결과
-            5. Thought: 결과 분석
-            6. Final Answer: 친근한 답변
+
+            사용 가능한 도구들의 설명:
+            {tools}
             
             {agent_scratchpad}
             
-            대화 규칙:
-            1. 친근하고 자연스러운 톤으로 대화하세요
-            2. 사용자의 활동 이력과 훈련 계획을 참고하여 맞춤형 조언을 제공하세요
-            3. 이전 대화 내용을 기억하고 연속성 있게 답변하세요
-            4. 구체적인 수치와 예시를 포함하되, 너무 전문적인 용어는 피하세요
-            5. 안전과 건강을 최우선으로 고려하세요
-            6. 답변은 200자 이내로 간단명료하게 작성하세요
-            7. 사용자의 수준에 맞는 조언을 제공하세요
-            8. 긍정적이고 격려하는 톤을 유지하세요
-            9. 필요할 때만 도구를 사용하고, 간단한 질문은 바로 답변하세요
-            10. 대화의 맥락을 유지하면서 자연스럽게 이어가세요
+            도구 사용 가이드라인:
+            1. 활동 데이터 조회 도구 (GetRunningActivities)
+               - 사용자의 최근 활동 데이터를 조회할 때 사용
+               - 훈련 강도와 빈도를 분석할 때 사용
+               - 부상 위험을 평가할 때 사용
 
-            답변 예시:
-            "안녕하세요! 지난번 5km 러닝 기록을 보니 페이스가 많이 좋아졌네요. 
-            이번 주 훈련 계획에 따르면 내일은 8km 러닝이 예정되어 있는데, 
-            지난번보다 조금 더 여유로운 페이스로 시작해보는 건 어떨까요? 
-            워밍업을 충분히 하고, 첫 2km는 편안한 페이스로 시작하면 좋을 것 같아요."
+            2. 월간 활동 분석 도구 (GetMonthlyActivitySummary)
+               - 사용자의 월간 활동 패턴을 파악할 때 사용
+               - 월간 활동 목표를 설정할 때 사용
+               - 월간 활동 성과를 평가할 때 사용
+
+            3. 일정 조회 도구 (GetSchedules)
+               - 현재 훈련 일정을 확인할 때 사용
+               - 일정 충돌을 확인할 때 사용
+
+            4. 일정 수정 도구 (UpdateSchedule)
+               - 훈련 강도 조절이 필요할 때 사용
+               - 훈련 일정 최적화가 필요할 때 사용
+               - 부상 예방을 위한 일정 조정이 필요할 때 사용
+            
+            중요 규칙:
+            1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
+            2. Action Input은 반드시 {{}} 형식으로 작성하세요.
+            3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요.
+            4. Final Answer는 다음 형식으로 작성하세요:
+               - 활동 분석: 사용자의 러닝 활동 데이터 분석 결과
+               - 훈련 제안: 현재 상태를 고려한 훈련 계획 제안
+               - 일정 관리: 필요한 경우 훈련 일정 수정 제안
+            5. 일정 수정이 필요한 경우, UpdateSchedule 도구를 사용하여 구체적인 수정 사항을 제안하세요.
+            6. 일정 수정 시 다음 형식을 정확히 따라주세요:
+               {{
+                   "id": "수정할 일정의 ID",
+                   "title": "수정된 제목",
+                   "schedule_datetime": "YYYY-MM-DDTHH:mm:ss",
+                   "description": "수정된 설명",
+                   "type": "훈련 또는 대회"
+               }}
+            7. 각 단계는 반드시 위의 형식을 정확히 따라야 합니다.
+            8. Action 단계는 반드시 제공된 도구 중 하나를 선택해야 합니다.
+            9. Final Answer는 모든 데이터 수집이 완료된 후에만 작성하세요.
+            10. 일정 수정은 사용자의 현재 상태와 목표를 고려하여 합리적인 범위 내에서 제안하세요.
+
+            컨텍스트 유지 규칙:
+            1. 이전 대화에서 언급된 중요 정보는 반드시 참조
+            2. 사용자의 목표와 현재 상태를 지속적으로 고려
+            3. 일관된 훈련 방향성 유지
+            4. 부상 위험을 지속적으로 모니터링
+            5. 사용자의 피드백을 다음 대화에서 반영
+
+            에러 처리 규칙:
+            1. 도구 실행 실패 시
+               - 대체 방안 제시
+               - 사용자에게 명확한 설명 제공
+               - 다음 단계 제안
+
+            2. 데이터 부족 시
+               - 추가 정보 요청
+               - 일반적인 가이드라인 제공
+               - 안전한 범위 내에서 조언
+
+            3. 일정 충돌 시
+               - 우선순위 설정
+               - 대체 일정 제안
+               - 사용자와 협의 필요성 판단
             """
         )
         

@@ -112,20 +112,18 @@ class RunningController:
     async def _handle_running_coach_prompt(self, request: MCPRequest) -> MCPResponse:
         try:
             user_id = request.parameters.get("user_id")
-            user_message = request.parameters.get("user_message")
+            user_message = request.parameters.get("user_message") or request.parameters.get("query")
             chat_history = request.parameters.get("chat_history")
-            activities = request.parameters.get("activities")
-            training_schedule = request.parameters.get("training_schedule")
-            
+            logger.info(f"## user_id: {user_id}")
+            logger.info(f"## user_message: {user_message}")
+            logger.info(f"## chat_history: {chat_history}")
             if not user_id or not user_message:
-                raise MCPError("user_id and user_message are required", "MISSING_PARAMETER")
+                raise MCPError("user_id and user_message/query are required", "MISSING_PARAMETER")
             
-            response = await self.ai_provider.generate_running_coach_response(
+            response = await self.ai_provider.running_coach_prompt(
                 user_id=user_id,
                 user_message=user_message,
-                chat_history=chat_history,
-                activities=activities,
-                training_schedule=training_schedule
+                chat_history=chat_history
             )
             return MCPResponse(
                 status="success",

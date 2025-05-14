@@ -327,7 +327,7 @@ async def request_activity_feedback(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/activities/training-schedule/{user_id}")
+@app.post("s/{user_id}")
 async def create_training_schedule(
     user_id: int,
     request: Request,
@@ -356,15 +356,20 @@ async def create_training_schedule(
         logger.error(f"훈련 일정 생성 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("/activities/training-schedule/{user_id}")
+@app.get("/schedules/{user_id}")
 async def get_training_schedule(user_id: int, db: Session = Depends(get_db)):
     schedule_service = ScheduleService(db)
     return schedule_service.get_user_schedules(user_id)
 
-@app.delete("/activities/training-schedule/{user_id}/{schedule_id}")
+@app.delete("/schedules/{user_id}/{schedule_id}")
 async def delete_training_schedule(user_id: int, schedule_id: int, db: Session = Depends(get_db)):
     schedule_service = ScheduleService(db)
     return schedule_service.delete_schedule(schedule_id, user_id)
+
+@app.put("/schedules/{user_id}/{schedule_id}")
+async def update_training_schedule(user_id: int, schedule_id: int, schedule_data: dict, db: Session = Depends(get_db)):
+    schedule_service = ScheduleService(db)
+    return schedule_service.update_schedule(schedule_id, user_id, schedule_data)
 
 @app.post("/running-coach/prompt")
 async def running_coach_prompt(request: Request, db: Session = Depends(get_db)):
@@ -372,37 +377,10 @@ async def running_coach_prompt(request: Request, db: Session = Depends(get_db)):
     user_message = body.get("user_message")
     chat_history = body.get("chat_history")
     user_id = body.get("user_id")
-    activities = body.get("activities")
-    training_schedule = body.get("training_schedule")
-    
-    # 활동 데이터 전처리
-    activities = [
-        {
-            "activity_id": activity["id"],
-            "distance": activity["distance"],
-            "duration": activity["duration"],
-            "pace": speed_to_pace(activity["speed"]),
-            "speed": activity["speed"],
-            "heart_rate": activity["heart_rate"],
-            "calories": activity["calories"],
-            "elevation": activity["elevation"],
-            "notes": activity["notes"]
-        }
-        for activity in activities
-    ]
-    
-    # 훈련 일정 전처리
-    training_schedule = [
-        {
-            "schedule_id": schedule["id"],
-            "race_name": schedule["race_name"],
-            "race_date": schedule["race_date"],
-            "race_type": schedule["race_type"],
-            "race_time": schedule["race_time"],
-            "special_notes": schedule["special_notes"]
-        }
-        for schedule in training_schedule
-    ]
+
+    logger.info(f"## user_message: {user_message}")
+    logger.info(f"## chat_history: {chat_history}")
+    logger.info(f"## user_id: {user_id}")
     
     # MCP 서버에 요청
     mcp_url = os.getenv("MCP_URL", "http://localhost:8000")
@@ -410,22 +388,26 @@ async def running_coach_prompt(request: Request, db: Session = Depends(get_db)):
         async with session.post(
             f"{mcp_url}/mcp",
             json={
-                "action": "analyze_activity",
+                "action": "running_coach_prompt",
                 "parameters": {
                     "user_id": user_id,
                     "query": user_message,
-                    "chat_history": chat_history,
-                    "activities": activities,
-                    "training_schedule": training_schedule
+                    "chat_history": chat_history
                 }
             }
         ) as response:
             if response.status == 200:
                 mcp_response = await response.json()
-                return mcp_response["message"]
+                if mcp_response.get("status") == "success" and mcp_response.get("data", {}).get("response", {}).get("response"):
+                    logger.info(f"## mcp_response: {mcp_response}")
+                    logger.info(f"## mcp_response['data']['response']['response']: {mcp_response['data']['response']['response']}")
+                    return mcp_response["data"]["response"]["response"]
+                else:
+                    logger.error(f"Invalid MCP response structure: {mcp_response}")
+                    return "죄송합니다. 응답을 처리하는 중에 문제가 발생했습니다."
             else:
-                return "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."  
-        
+                logger.error(f"MCP server error: {response.status}")
+                return "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."
 
 ## 유틸 함수
 #region 유틸

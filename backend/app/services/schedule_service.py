@@ -203,4 +203,45 @@ class ScheduleService:
         except Exception as e:
             logger.error(f"훈련 일정 삭제 중 오류 발생: {str(e)}")
             raise
+
+    def update_schedule(self, schedule_id: int, user_id: int, schedule_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        훈련 일정 수정
+        
+        Args:
+            schedule_id: 일정 ID
+            user_id: 사용자 ID
+            schedule_data: 수정할 일정 데이터
+        Returns:
+            수정된 일정 정보
+        """
+        try:
+            schedule = self.db.query(TrainingSchedule).filter(
+                TrainingSchedule.id == schedule_id,
+                TrainingSchedule.user_id == user_id
+            ).first()
+            
+            if not schedule:
+                raise Exception("일정을 찾을 수 없습니다.")
+            
+            # datetime 필드를 schedule_datetime으로 변환
+            if "datetime" in schedule_data:
+                schedule_data["schedule_datetime"] = datetime.fromisoformat(schedule_data["datetime"].replace("Z", "+00:00"))
+                del schedule_data["datetime"]
+            
+            logger.info(f"수정할 일정 데이터: {schedule_data}")
+            
+            for key, value in schedule_data.items():
+                setattr(schedule, key, value)
+            
+            self.db.commit()
+            self.db.refresh(schedule)
+            
+            logger.info(f"수정된 일정: {schedule.to_dict()}")
+            return schedule.to_dict()
+        
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"훈련 일정 수정 중 오류 발생: {str(e)}")
+            raise
         

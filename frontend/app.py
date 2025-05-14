@@ -153,7 +153,7 @@ def format_duration(duration_str):
 def get_schedules():
     try:
         response = requests.get(
-            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}",
+            f"{API_BASE_URL}/schedules/{st.session_state.user['id']}",
             headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
@@ -169,7 +169,7 @@ def get_schedules():
 def delete_schedule(schedule_id):
     try:
         response = requests.delete(
-            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}/{schedule_id}",
+            f"{API_BASE_URL}/schedules/{st.session_state.user['id']}/{schedule_id}",
             headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
@@ -732,7 +732,7 @@ with tab6:
                     - 목표 시간: {target_time}""")
                     try:
                         response = requests.post(
-                            f"{API_BASE_URL}/activities/training-schedule/{st.session_state.user['id']}",
+                            f"{API_BASE_URL}/schedules/{st.session_state.user['id']}",
                             headers={"Authorization": f"Bearer {st.session_state.token}"},
                             json={"race_name": race_name, "race_date": race_date, "race_type": race_type, "race_time": target_time, "special_notes": special_notes}
                         )
@@ -838,9 +838,7 @@ with tab7:
                     request_data = {
                         "user_message": user_input,
                         "chat_history": st.session_state.chat_history,
-                        "user_id": st.session_state.user_id,  # 사용자 ID
-                        "activities": st.session_state.activities,  # 사용자의 활동 데이터
-                        "training_schedule": st.session_state.training_schedule  # 훈련 일정
+                        "user_id": st.session_state.user['id']
                     }
                     
                     # API 호출
@@ -848,12 +846,38 @@ with tab7:
                         f"{API_BASE_URL}/running-coach/prompt",
                         json=request_data
                     )
-                    
+
                     if response.status_code == 200:
-                        response_data = response.json()
-                        response = response_data["message"]
+                        try:
+                            response_data = response.json()
+                            
+                            # 응답 데이터 구조 확인
+                            if not response_data:
+                                st.error("응답 데이터가 비어있습니다.")
+                                response = "죄송합니다. 응답 데이터가 비어있습니다."
+                            elif isinstance(response_data, str):
+                                # 문자열 응답인 경우 그대로 사용
+                                response = response_data
+                            elif isinstance(response_data, dict):
+                                # 딕셔너리인 경우 예상된 구조 확인
+                                if response_data.get("status") == "success":
+                                    if "data" in response_data and "response" in response_data["data"]:
+                                        response = response_data["data"]["response"]
+                                    else:
+                                        st.error("응답 데이터 구조가 예상과 다릅니다.")
+                                        response = "죄송합니다. 응답 데이터 구조가 예상과 다릅니다."
+                                else:
+                                    st.error(f"응답 상태가 성공이 아닙니다: {response_data.get('status')}")
+                                    response = "죄송합니다. 응답 상태가 성공이 아닙니다."
+                            else:
+                                st.error(f"예상치 못한 응답 데이터 타입: {type(response_data)}")
+                                response = "죄송합니다. 예상치 못한 응답 데이터 타입입니다."
+                        except Exception as e:
+                            st.error(f"응답 데이터 처리 중 오류 발생: {str(e)}")
+                            response = "죄송합니다. 응답 데이터 처리 중 오류가 발생했습니다."
                     else:
-                        response = "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."
+                        st.error(f"서버 응답 오류: {response.status_code}")
+                        response = "죄송합니다. 서버 응답 오류가 발생했습니다."
                     
                     
                     # 어시스턴트 메시지 추가
