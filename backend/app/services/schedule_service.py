@@ -15,7 +15,7 @@ class ScheduleService:
         self.db = db
         self.mcp_url = "http://localhost:8000"  # MCP 서버 URL 설정 필요
 
-    async def create_training_schedule_schedule(
+    async def create_training_schedule(
         self,
         user_id: int,
         race_name: str,

@@ -236,7 +236,6 @@ class AIProvider:
             {{
                 "schedules": [
                     {{
-                        "id": 1,
                         "title": "[5km] 기초 체력 훈련",
                         "datetime": "2025-06-01T08:00:00",
                         "description": "총 거리: 5km\n총 시간: 30분\n목표 페이스: 6:00/km\n훈련 내용: 1) 5분 워밍업\n2) 3km 페이스 6:00/km\n3) 1km 페이스 5:45/km\n4) 1km 페이스 5:30/km\n5) 5분 쿨다운",

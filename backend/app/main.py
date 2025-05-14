@@ -327,7 +327,7 @@ async def request_activity_feedback(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("s/{user_id}")
+@app.post("/schedules/{user_id}")
 async def create_training_schedule(
     user_id: int,
     request: Request,
@@ -343,7 +343,7 @@ async def create_training_schedule(
         special_notes = body.get("special_notes")
 
         schedule_service = ScheduleService(db)
-        schedule = await schedule_service.create_training_schedule_schedule(
+        schedule = await schedule_service.create_training_schedule(
             user_id=user_id,
             race_name=race_name,
             race_date=race_date,
