@@ -52,7 +52,7 @@ class AIProvider:
         """러닝 활동 분석"""
         try:
             # 에이전트 생성 및 실행
-            tools = await self._create_tools(user_id)
+            tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
             agent = self._create_ativity_coaching_agent(tools)
             executor = self._create_executor(agent, tools)
             
@@ -74,8 +74,8 @@ class AIProvider:
             logger.error(f"활동 분석 실패: {str(e)}")
             raise
 
-    async def _create_tools(self, user_id: int) -> list[Tool]:
-        """에이전트 도구 생성"""
+    async def _create_get_activities_tool(self, user_id: int) -> Tool:
+        """러닝 활동 조회 도구 생성"""
         async def get_activities_wrapper(_):
             try:
                 logger.info("GetRunningActivities 도구 실행 시작")
@@ -87,6 +87,25 @@ class AIProvider:
                 logger.error(f"Error in get_activities_wrapper: {str(e)}")
                 return "[]"
         
+        def sync_get_activities(_):
+            try:
+                logger.info("sync_get_activities 시작")
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                logger.info("새로운 이벤트 루프 생성")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            logger.info("get_activities_wrapper 실행")
+            return loop.run_until_complete(get_activities_wrapper(_))
+        
+        return Tool(
+            name="GetRunningActivities",
+            func=sync_get_activities,
+            description="모든 러닝 활동 데이터를 조회합니다. 러닝 활동 데이터는 러닝 활동 이름, 시작 시간, 거리, 소요시간, 페이스, 심박수, 칼로리, 위치, 날씨, 노트 등의 정보를 포함합니다."
+        )
+
+    async def _create_get_monthly_summary_tool(self, user_id: int) -> Tool:
+        """월간 활동 요약 도구 생성"""
         async def get_monthly_summary_wrapper(_):
             try:
                 logger.info("GetMonthlyActivitySummary 도구 실행 시작")
@@ -98,18 +117,6 @@ class AIProvider:
                 logger.error(f"Error in get_monthly_summary_wrapper: {str(e)}")
                 return "{}"
         
-        # 비동기 함수를 동기 함수로 래핑
-        def sync_get_activities(_):
-            try:
-                logger.info("sync_get_activities 시작")
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                logger.info("새로운 이벤트 루프 생성")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            logger.info("get_activities_wrapper 실행")
-            return loop.run_until_complete(get_activities_wrapper(_))
-            
         def sync_get_monthly_summary(_):
             try:
                 logger.info("sync_get_monthly_summary 시작")
@@ -121,20 +128,36 @@ class AIProvider:
             logger.info("get_monthly_summary_wrapper 실행")
             return loop.run_until_complete(get_monthly_summary_wrapper(_))
         
+        return Tool(
+            name="GetMonthlyActivitySummary",
+            func=sync_get_monthly_summary,
+            description="러닝 활동 월간 통계를 조회합니다. 월별 거리, 소요시간, 평균 페이스를 조회합니다."
+        )
+
+    async def _create_tools(self, user_id: int, tool_names: list[str] = None) -> list[Tool]:
+        """요청된 도구들을 생성하여 반환"""
         logger.info("도구 생성 시작")
-        tools = [
-            Tool(
-                name="GetRunningActivities",
-                func=sync_get_activities,
-                description="모든 러닝 활동 데이터를 조회합니다. 러닝 활동 데이터는 러닝 활동 이름, 시작 시간, 거리, 소요시간, 페이스, 심박수, 칼로리, 위치, 날씨, 노트 등의 정보를 포함합니다."
-            ),
-            Tool(
-                name="GetMonthlyActivitySummary",
-                func=sync_get_monthly_summary,
-                description="러닝 활동 월간 통계를 조회합니다. 월별 거리, 소요시간, 평균 페이스를 조회합니다."
-            )
-        ]
-        logger.info("도구 생성 완료")
+        
+        # 도구 생성 함수 매핑
+        tool_creators = {
+            "GetRunningActivities": lambda: self._create_get_activities_tool(user_id),
+            "GetMonthlyActivitySummary": lambda: self._create_get_monthly_summary_tool(user_id)
+        }
+        
+        # 도구 이름이 지정되지 않은 경우 모든 도구 생성
+        if tool_names is None:
+            tool_names = list(tool_creators.keys())
+        
+        # 요청된 도구들 생성
+        tools = []
+        for tool_name in tool_names:
+            if tool_name in tool_creators:
+                tool = await tool_creators[tool_name]()
+                tools.append(tool)
+            else:
+                logger.warning(f"알 수 없는 도구 이름: {tool_name}")
+        
+        logger.info(f"생성된 도구: {[tool.name for tool in tools]}")
         return tools
 
     def _create_ativity_coaching_agent(self, tools: list[Tool]):
@@ -199,7 +222,7 @@ class AIProvider:
                 logger.info(f"훈련 일정 생성 시도 {attempt + 1}/{max_retries}")
                 
                 # 에이전트 생성 및 실행
-                tools = await self._create_tools(user_id)
+                tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
                 logger.info("도구 생성 완료")
                 
                 agent = self._create_race_training_agent(tools)
@@ -321,7 +344,7 @@ class AIProvider:
         """러닝 코치 응답 생성"""
         try:
             # 에이전트 생성 및 실행
-            tools = await self._create_tools(user_id)
+            tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
             agent = self._create_generate_running_coach_agent(tools)
             executor = self._create_executor(agent, tools)
             
