@@ -270,7 +270,6 @@ async def request_activity_feedback(
         # 1. 활동 데이터 조회
         activity_service = ActivityService(db)
         activity = activity_service.get_activity(user_id, activity_id)
-        
         laps = activity_service.get_activity_laps(activity_id)
         
         if not activity:

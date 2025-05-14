@@ -8,7 +8,9 @@ from langchain_core.tools import Tool
 from langchain_core.prompts import PromptTemplate
 from google.cloud import aiplatform
 from ..providers.backend_provider import BackendProvider
+from ..providers.tools_manager import ToolManager
 import asyncio
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ class AIProvider:
         self._initialize_vertex_ai()
         self.llm = self._create_llm()
         self.backend_provider = BackendProvider()
+        self.tool_manager = ToolManager(self.backend_provider)
 
     def _initialize_vertex_ai(self):
         """Vertex AI 초기화"""
@@ -52,7 +55,7 @@ class AIProvider:
         """러닝 활동 분석"""
         try:
             # 에이전트 생성 및 실행
-            tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
+            tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
             agent = self._create_ativity_coaching_agent(tools)
             executor = self._create_executor(agent, tools)
             
@@ -74,99 +77,22 @@ class AIProvider:
             logger.error(f"활동 분석 실패: {str(e)}")
             raise
 
-    async def _create_get_activities_tool(self, user_id: int) -> Tool:
-        """러닝 활동 조회 도구 생성"""
-        async def get_activities_wrapper(_):
-            try:
-                logger.info("GetRunningActivities 도구 실행 시작")
-                result = await self.backend_provider.get_running_activities(user_id)
-                logger.info(f"GetRunningActivities 결과: {result}")
-                import json
-                return json.dumps(result, ensure_ascii=False)
-            except Exception as e:
-                logger.error(f"Error in get_activities_wrapper: {str(e)}")
-                return "[]"
-        
-        def sync_get_activities(_):
-            try:
-                logger.info("sync_get_activities 시작")
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                logger.info("새로운 이벤트 루프 생성")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            logger.info("get_activities_wrapper 실행")
-            return loop.run_until_complete(get_activities_wrapper(_))
-        
-        return Tool(
-            name="GetRunningActivities",
-            func=sync_get_activities,
-            description="모든 러닝 활동 데이터를 조회합니다. 러닝 활동 데이터는 러닝 활동 이름, 시작 시간, 거리, 소요시간, 페이스, 심박수, 칼로리, 위치, 날씨, 노트 등의 정보를 포함합니다."
-        )
-
-    async def _create_get_monthly_summary_tool(self, user_id: int) -> Tool:
-        """월간 활동 요약 도구 생성"""
-        async def get_monthly_summary_wrapper(_):
-            try:
-                logger.info("GetMonthlyActivitySummary 도구 실행 시작")
-                result = await self.backend_provider.get_monthly_activity_summary(user_id)
-                logger.info(f"GetMonthlyActivitySummary 결과: {result}")
-                import json
-                return json.dumps(result, ensure_ascii=False)
-            except Exception as e:
-                logger.error(f"Error in get_monthly_summary_wrapper: {str(e)}")
-                return "{}"
-        
-        def sync_get_monthly_summary(_):
-            try:
-                logger.info("sync_get_monthly_summary 시작")
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                logger.info("새로운 이벤트 루프 생성")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            logger.info("get_monthly_summary_wrapper 실행")
-            return loop.run_until_complete(get_monthly_summary_wrapper(_))
-        
-        return Tool(
-            name="GetMonthlyActivitySummary",
-            func=sync_get_monthly_summary,
-            description="러닝 활동 월간 통계를 조회합니다. 월별 거리, 소요시간, 평균 페이스를 조회합니다."
-        )
-
-    async def _create_tools(self, user_id: int, tool_names: list[str] = None) -> list[Tool]:
-        """요청된 도구들을 생성하여 반환"""
-        logger.info("도구 생성 시작")
-        
-        # 도구 생성 함수 매핑
-        tool_creators = {
-            "GetRunningActivities": lambda: self._create_get_activities_tool(user_id),
-            "GetMonthlyActivitySummary": lambda: self._create_get_monthly_summary_tool(user_id)
-        }
-        
-        # 도구 이름이 지정되지 않은 경우 모든 도구 생성
-        if tool_names is None:
-            tool_names = list(tool_creators.keys())
-        
-        # 요청된 도구들 생성
-        tools = []
-        for tool_name in tool_names:
-            if tool_name in tool_creators:
-                tool = await tool_creators[tool_name]()
-                tools.append(tool)
-            else:
-                logger.warning(f"알 수 없는 도구 이름: {tool_name}")
-        
-        logger.info(f"생성된 도구: {[tool.name for tool in tools]}")
-        return tools
-
     def _create_ativity_coaching_agent(self, tools: list[Tool]):
         """에이전트 생성"""
         prompt = PromptTemplate.from_template(
-            """당신은 마라톤 코치 전문가입니다. 사용자의 러닝 활동 데이터를 간단하고 명확하게 분석하여 핵심적인 피드백을 제공합니다.
+            """당신은 마라톤 코치 전문가입니다. 사용자가 선택한 특정 러닝 활동 데이터를 분석하여 맞춤형 피드백을 제공합니다.
             오늘 날짜는 {today}입니다.
 
-            다음 형식으로 단계별로 진행하세요:
+            분석할 활동 데이터:
+            {input}
+
+            사용자의 코멘트:
+            {comments}
+
+            랩 데이터:
+            {laps}
+
+            다음 형식으로 단계별로 진행하세요. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요:
             
             Thought: 현재 단계에서 해야 할 일을 설명
             
@@ -191,10 +117,16 @@ class AIProvider:
             1. 각 단계는 반드시 새로운 줄에서 시작하고, 단계 사이에 빈 줄을 추가하세요.
             2. Action Input은 반드시 {{}} 형식으로 작성하세요.
             3. Observation은 도구 결과를 JSON 문자열 그대로 복사하세요.
-            4. Final Answer는 다음 형식으로 간단하게 작성하세요 (500자 이내):
-               - 핵심 성과: 가장 눈에 띄는 성과나 개선점
-               - 주요 피드백: 가장 중요한 1-2가지 개선 제안
-               - 다음 활동을 위한 팁: 즉시 적용할 수 있는 구체적인 조언
+            4. Final Answer는 다음 형식으로 간단하게 작성하세요 (300자 이내):
+               - 핵심 성과: 선택된 활동에서 가장 눈에 띄는 성과나 개선점
+               - 주요 피드백: 선택된 활동을 기반으로 한 가장 중요한 1-2가지 개선 제안
+               - 다음 활동을 위한 팁: 선택된 활동의 특성을 고려한 구체적인 조언
+            5. 도구는 선택된 활동의 맥락을 이해하기 위한 보조 정보로만 사용하세요.
+            6. 분석의 중심은 반드시 선택된 활동 데이터({input})여야 합니다.
+            7. 사용자의 코멘트와 랩 데이터를 반드시 고려하여 분석하세요.
+            8. 각 단계는 반드시 위의 형식을 정확히 따라야 합니다.
+            9. Action 단계는 반드시 제공된 도구 중 하나를 선택해야 합니다.
+            10. Final Answer는 모든 데이터 수집이 완료된 후에만 작성하세요.
             """
         )
         
@@ -203,7 +135,8 @@ class AIProvider:
             tools=tools,
             prompt=prompt
         )
-    
+
+
     async def create_race_training(
         self,
         user_id: int,
@@ -222,7 +155,7 @@ class AIProvider:
                 logger.info(f"훈련 일정 생성 시도 {attempt + 1}/{max_retries}")
                 
                 # 에이전트 생성 및 실행
-                tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
+                tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
                 logger.info("도구 생성 완료")
                 
                 agent = self._create_race_training_agent(tools)
@@ -344,7 +277,7 @@ class AIProvider:
         """러닝 코치 응답 생성"""
         try:
             # 에이전트 생성 및 실행
-            tools = await self._create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
+            tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
             agent = self._create_generate_running_coach_agent(tools)
             executor = self._create_executor(agent, tools)
             
