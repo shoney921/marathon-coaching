@@ -141,10 +141,10 @@ class AIProvider:
         )
 
     """
-    2. create_race_training
+    2. create_training_schedule
     사용자의 러닝 활동 데이터를 분석하여 대회 일정까지 맞는 훈련 일정을 제공합니다.
     """
-    async def create_race_training(
+    async def create_training_schedule(
         self,
         user_id: int,
         race_name: str,
@@ -162,10 +162,10 @@ class AIProvider:
                 logger.info(f"훈련 일정 생성 시도 {attempt + 1}/{max_retries}")
                 
                 # 에이전트 생성 및 실행
-                tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary"])
+                tools = self.tool_manager.create_tools(user_id, ["GetRunningActivities", "GetMonthlyActivitySummary", "GetSchedules"])
                 logger.info("도구 생성 완료")
                 
-                agent = self._create_race_training_agent(tools)
+                agent = self._create_training_schedule_agent(tools)
                 logger.info("에이전트 생성 완료")
                 
                 executor = self._create_executor(agent, tools)
@@ -202,7 +202,7 @@ class AIProvider:
                     raise Exception(f"훈련 일정 생성 실패 (시도 {attempt + 1}/{max_retries}): {error_message}")
 
     #대회 날짜를 보고 훈련 일정을 짜주는 에이전트
-    def _create_race_training_agent(self, tools: list[Tool]):
+    def _create_training_schedule_agent(self, tools: list[Tool]):
         """에이전트 생성"""
         logger.info("훈련 일정 에이전트 생성 시작")
         prompt = PromptTemplate.from_template(

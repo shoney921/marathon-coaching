@@ -21,8 +21,8 @@ class RunningController:
                 return await self._handle_get_monthly_summary(request)
             elif request.action == "analyze_activity":
                 return await self._handle_analyze_activity(request)
-            elif request.action == "create_race_training":
-                return await self._handle_create_race_training(request)
+            elif request.action == "create_training_schedule":
+                return await self._handle_create_training_schedule(request)
             elif request.action == "running_coach_prompt":
                 return await self._handle_running_coach_prompt(request)
             else:
@@ -77,7 +77,7 @@ class RunningController:
                 data=None
             )
 
-    async def _handle_create_race_training(self, request: MCPRequest) -> MCPResponse:
+    async def _handle_create_training_schedule(self, request: MCPRequest) -> MCPResponse:
         try:
             user_id = request.parameters.get("user_id")
             race_name = request.parameters.get("race_name")
@@ -89,7 +89,7 @@ class RunningController:
             if not user_id or not race_name or not race_date or not race_type or not race_time:
                 raise MCPError("All parameters are required", "MISSING_PARAMETER")
             
-            training_schedule = await self.ai_provider.create_race_training(
+            training_schedule = await self.ai_provider.create_training_schedule(
                 user_id=user_id,
                 race_name=race_name,
                 race_date=race_date,

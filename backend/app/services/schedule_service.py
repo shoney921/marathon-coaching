@@ -15,7 +15,7 @@ class ScheduleService:
         self.db = db
         self.mcp_url = "http://localhost:8000"  # MCP 서버 URL 설정 필요
 
-    async def create_race_training_schedule(
+    async def create_training_schedule_schedule(
         self,
         user_id: int,
         race_name: str,
@@ -40,7 +40,7 @@ class ScheduleService:
         try:
             # MCP 서버에 요청할 데이터 준비
             request_data = {
-                "action": "create_race_training",
+                "action": "create_training_schedule",
                 "parameters": {
                     "user_id": user_id,
                     "race_name": race_name,
