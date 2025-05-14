@@ -123,12 +123,26 @@ def get_activity_summary():
         st.error(f"API 연결 오류: {str(e)}")
     return None
 
-def get_dashboard_data():
+def get_dashboard_feedback():
     response = None
 
     try:
         response = requests.get(
-            f"{API_BASE_URL}/dashboard/user/{st.session_state.user['id']}",
+            f"{API_BASE_URL}/dashboard/user/{st.session_state.user['id']}/feedback",
+            headers={"Authorization": f"Bearer {st.session_state.token}"}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"API 연결 오류: {str(e)}")
+    return None
+
+def get_dashboard_upcoming_schedule():
+    response = None
+
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/dashboard/user/{st.session_state.user['id']}/upcoming-schedule",
             headers={"Authorization": f"Bearer {st.session_state.token}"}
         )
         if response.status_code == 200:
@@ -188,7 +202,8 @@ tab1, tab5, tab6, tab7 = st.tabs(["🏠 홈", "📊 활동 기록", "📅 일정
 with tab1:
     st.title(f"🏃 {st.session_state.user['username']}님, 환영합니다!")
 
-    dashboard_data = get_dashboard_data()
+    dashboard_feedback = get_dashboard_feedback()
+    dashboard_upcoming_schedule = get_dashboard_upcoming_schedule()
     
     col1, col2 = st.columns(2)
     with col1:
@@ -207,14 +222,14 @@ with tab1:
                     <h4>📊 최근 활동 피드백</h4>
                 </div>
             """, unsafe_allow_html=True)
-            # TODO: 최근 활동 피드백 내용 추가
-            if dashboard_data:
-                st.write(dashboard_data['latest_feedback'])
+            if dashboard_feedback:
+                st.write(f"{datetime.fromisoformat(dashboard_feedback['created_at']).strftime('%Y년 %m월 %d일 %H시')}")
+                st.write(f"{dashboard_feedback['feedback_data']}")
             else:
                 st.write("활동기록 탭에서 활동에 대한 피드백을 요청해주세요")
     
     with col2:
-        # 장단점 피드백 섹션
+        # 다가오는 최근 일정
         with st.container():
             st.markdown("""
                 <style>
@@ -226,12 +241,13 @@ with tab1:
                 }
                 </style>
                 <div class="strength-weakness">
-                    <h4>💪 나의 장단점 피드백</h4>
+                    <h4>💪 다가오는 일정</h4>
                 </div>
             """, unsafe_allow_html=True)
-            # TODO: 장단점 피드백 내용 추가
-            if dashboard_data:
-                st.write(dashboard_data['runner_feedback'])
+            if dashboard_upcoming_schedule:
+                st.write(f"{datetime.fromisoformat(dashboard_upcoming_schedule['datetime']).strftime('%Y년 %m월 %d일 %H시')}")
+                st.write(f"제목: {dashboard_upcoming_schedule['title']}")
+                st.write(f"설명: {dashboard_upcoming_schedule['description']}")
             else:
                 st.write("피드백 요청 탭에서 피드백을 요청해주세요")
     

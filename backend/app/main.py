@@ -409,6 +409,16 @@ async def running_coach_prompt(request: Request, db: Session = Depends(get_db)):
                 logger.error(f"MCP server error: {response.status}")
                 return "죄송합니다. 답변을 생성하는 중에 문제가 발생했습니다."
 
+@app.get("/dashboard/user/{user_id}/feedback")
+async def get_dashboard_feedback(user_id: int, db: Session = Depends(get_db)):
+    activity_service = ActivityService(db)
+    return activity_service.get_dashboard_feedback(user_id)
+
+@app.get("/dashboard/user/{user_id}/upcoming-schedule")
+async def get_upcoming_schedule(user_id: int, db: Session = Depends(get_db)):
+    schedule_service = ScheduleService(db)
+    return schedule_service.get_upcoming_schedule(user_id)
+
 ## 유틸 함수
 #region 유틸
 def format_duration(seconds: float) -> str:

@@ -487,6 +487,14 @@ class ActivityService:
         feedback = self.db.query(ActivityFeedback).filter(ActivityFeedback.activity_id == activity_id).first()
         return feedback
     
+    def get_dashboard_feedback(self, user_id: int):
+        """
+        대시보드 정보를 조회합니다.
+        activity_id 가 높은(최신) 활동 피드백 데이터를 조회합니다.
+        """
+        feedback = self.db.query(ActivityFeedback).filter(ActivityFeedback.user_id == user_id).order_by(ActivityFeedback.activity_id.desc()).first()
+        return feedback
+    
     def get_activity_laps(self, activity_id: int):
         """
         활동의 랩 데이터를 조회합니다.

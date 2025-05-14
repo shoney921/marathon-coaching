@@ -245,3 +245,24 @@ class ScheduleService:
             logger.error(f"훈련 일정 수정 중 오류 발생: {str(e)}")
             raise
         
+    def get_upcoming_schedule(self, user_id: int) -> Dict[str, Any]:
+        """
+        다가오는 최근 일정 조회
+        
+        Args:
+            user_id: 사용자 ID
+        Returns:
+            다가오는 최근 일정 정보
+        """
+        try:
+            # 현재시간 이 후 가장 빠른 일정 조회
+            upcoming_schedule = self.db.query(TrainingSchedule).filter(
+                TrainingSchedule.user_id == user_id,
+                TrainingSchedule.schedule_datetime > datetime.now()
+            ).order_by(TrainingSchedule.schedule_datetime).first()
+            
+            return upcoming_schedule.to_dict()
+        except Exception as e:
+            logger.error(f"다가오는 최근 일정 조회 중 오류 발생: {str(e)}")
+            raise
+    
