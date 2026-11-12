@@ -8,3 +8,7 @@ __pycache__/
 
 .vscode/
 .env
+.env.*
+!.env.example
+.garminconnect/
+.garth/
